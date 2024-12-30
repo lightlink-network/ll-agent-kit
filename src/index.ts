@@ -1,2 +1,2 @@
-export * from "./agent.js";
+export * from "./llagent.js";
 export * from "./network.js";

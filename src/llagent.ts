@@ -11,7 +11,7 @@ import {
   type CallContractParams,
 } from "./tools/call_contract.js";
 
-interface LLAgentConfig extends AgentOptions {
+export interface LLAgentConfig extends AgentOptions {
   privateKey: string;
   network: Network;
 }
@@ -32,6 +32,7 @@ export class LLAgent {
   }
 
   async execute(input: string) {
+    console.log("[LLAgent:execute] 💬 '" + input + "'");
     const response = await this.agent.invoke({ input });
 
     return response;
