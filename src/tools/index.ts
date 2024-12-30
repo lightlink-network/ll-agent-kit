@@ -8,8 +8,12 @@ import type { WalletProvider } from "../wallet.js";
 
 // Creates all tools for the agent
 export const createTools = (agent: WalletProvider) => [
-  tool(withWallet(agent, sendTx), SendTxToolDefinition),
-  tool(withWallet(agent, callContract), CallContractToolDefinition),
-  tool(withWallet(agent, getBalance), GetBalanceToolDefinition),
-  tool(withWallet(agent, transfer), TransferToolDefinition),
+  tool(asJson(withWallet(agent, sendTx)), SendTxToolDefinition),
+  tool(asJson(withWallet(agent, callContract)), CallContractToolDefinition),
+  tool(asJson(withWallet(agent, getBalance)), GetBalanceToolDefinition),
+  tool(asJson(withWallet(agent, transfer)), TransferToolDefinition),
 ];
+
+export const asJson = <T, R>(fn: (params: T) => Promise<R>) => {
+  return async (params: T) => JSON.stringify(await fn(params));
+};
