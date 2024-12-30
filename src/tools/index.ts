@@ -5,7 +5,6 @@ import { getBalance, GetBalanceToolDefinition } from "./get_balance.js";
 import { transfer, TransferToolDefinition } from "./transfer.js";
 import { callContract, CallContractToolDefinition } from "./call_contract.js";
 import type { WalletProvider } from "../wallet.js";
-import { bigint } from "zod";
 
 // Creates all tools for the agent
 export const createTools = (agent: WalletProvider) => [
