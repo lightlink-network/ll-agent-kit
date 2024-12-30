@@ -11,13 +11,15 @@ export const SendTxParamsSchema = z.object({
   calldata: z.string().optional().describe("The calldata to send as hex"),
 });
 
+export type SendTxParams = z.infer<typeof SendTxParamsSchema>;
+
 export const SendTxToolDefinition = {
   name: "send_transaction",
   description: "Send a raw ethereum transaction",
   schema: SendTxParamsSchema,
 };
 
-export const sendTx: WalletToolFn<z.infer<typeof SendTxParamsSchema>> = async (
+export const sendTx: WalletToolFn<SendTxParams> = async (
   privateKey,
   network,
   params

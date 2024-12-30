@@ -12,15 +12,19 @@ export const CallContractParamsSchema = z.object({
     ),
 });
 
+export type CallContractParams = z.infer<typeof CallContractParamsSchema>;
+
 export const CallContractToolDefinition = {
   name: "call_contract",
   description: "Call any contract with raw calldata",
   schema: CallContractParamsSchema,
 };
 
-export const callContract: WalletToolFn<
-  z.infer<typeof CallContractParamsSchema>
-> = async (privateKey, network, params) => {
+export const callContract: WalletToolFn<CallContractParams> = async (
+  privateKey,
+  network,
+  params
+) => {
   const provider = makeNetworkProvider(network);
   const wallet = new Wallet(privateKey, provider);
 

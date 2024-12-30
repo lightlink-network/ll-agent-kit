@@ -17,6 +17,8 @@ const BalanceParamsSchema = z.object({
     ),
 });
 
+export type GetBalanceParams = z.infer<typeof BalanceParamsSchema>;
+
 export const GetBalanceToolDefinition = {
   name: "get_balance",
   description:
@@ -24,9 +26,11 @@ export const GetBalanceToolDefinition = {
   schema: BalanceParamsSchema,
 };
 
-export const getBalance: WalletToolFn<
-  z.infer<typeof BalanceParamsSchema>
-> = async (privateKey, network, params) => {
+export const getBalance: WalletToolFn<GetBalanceParams> = async (
+  privateKey,
+  network,
+  params
+) => {
   const provider = makeNetworkProvider(network);
 
   if (!params.token) {

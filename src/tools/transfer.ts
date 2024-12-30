@@ -15,15 +15,19 @@ const TransferParamsSchema = z.object({
     ),
 });
 
+export type TransferParams = z.infer<typeof TransferParamsSchema>;
+
 export const TransferToolDefinition = {
   name: "transfer",
   description: "Transfer any token or native currency to a wallet",
   schema: TransferParamsSchema,
 };
 
-export const transfer: WalletToolFn<
-  z.infer<typeof TransferParamsSchema>
-> = async (privateKey, network, params) => {
+export const transfer: WalletToolFn<TransferParams> = async (
+  privateKey,
+  network,
+  params
+) => {
   const provider = makeNetworkProvider(network);
   const wallet = new Wallet(privateKey, provider);
 
