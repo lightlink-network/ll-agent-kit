@@ -39,7 +39,7 @@ export const getBalance: WalletToolFn<
   const provider = makeNetworkProvider(network);
 
   if (!params.token) {
-    console.log("[getBalance]: getting native currency balance");
+    console.log("[tool:get_balance]: getting native currency balance");
     const balance = await provider.getBalance(params.address);
     return {
       status: "success",
@@ -52,7 +52,7 @@ export const getBalance: WalletToolFn<
     throw new Error("Invalid token address");
   }
 
-  console.log("[getBalance]: getting token balance");
+  console.log("[tool:get_balance]: getting token balance", params);
   const token = new Contract(params.token, ERC20ABI, provider);
   if (!token.balanceOf || !token.decimals || !token.symbol) {
     throw new Error("Internal error: Incorrect ERC20 ABI");

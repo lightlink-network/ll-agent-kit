@@ -95,5 +95,6 @@ export const createAgent = (
   return new AgentExecutor({
     agent,
     tools,
+    verbose: process.env.VERBOSE === "true",
   });
 };

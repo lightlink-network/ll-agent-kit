@@ -32,7 +32,7 @@ export const transfer: WalletToolFn<TransferParams, TxResult> = async (
   const wallet = new Wallet(privateKey, provider);
 
   if (!params.token) {
-    console.log("[transfer]: transferring native currency");
+    console.log("[tool:transfer]: transferring native currency", params);
     const tx = await wallet.sendTransaction({
       to: params.to,
       value: parseEther(params.amount.toString()),
@@ -49,7 +49,7 @@ export const transfer: WalletToolFn<TransferParams, TxResult> = async (
   }
 
   // get the token contract
-  console.log("[transfer]: transferring token");
+  console.log("[tool:transfer]: transferring token", params);
   const token = new Contract(params.token, ERC20ABI, provider);
   if (!token.transfer || !token.decimals) {
     throw new Error("Internal error: Incorrect ERC20 ABI");

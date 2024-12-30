@@ -32,6 +32,7 @@ export const callContract: WalletToolFn<
   const provider = makeNetworkProvider(network);
   const wallet = new Wallet(privateKey, provider);
 
+  console.log("[tool:call_contract]: calling contract", params);
   const result = await wallet.call({
     to: params.target,
     data: params.calldata,
