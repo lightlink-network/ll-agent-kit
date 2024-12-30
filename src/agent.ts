@@ -7,11 +7,14 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createTools } from "./tools/index.js";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
+import { Wallet } from "ethers";
 
-const createSystemMessage = (network: Network) =>
+const createSystemMessage = (network: Network, address: string) =>
   new SystemMessage(
     `You are an AI agent on ${network.name} network capable of executing all kinds of transactions and interacting with the ${network.name} blockchain.
     ${network.name} is an EVM compatible layer 2 network. You are able to execute transactions on behalf of the user.
+
+     The user's address is ${address}.
 
     If the transaction was successful, return the response in the following format:
     The transaction was successful. The explorer link is: ${network.explorerUrl}/tx/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
@@ -22,9 +25,9 @@ const createSystemMessage = (network: Network) =>
   `
   );
 
-const createPrompt = (network: Network) =>
+const createPrompt = (network: Network, address: string) =>
   ChatPromptTemplate.fromMessages([
-    createSystemMessage(network),
+    createSystemMessage(network, address),
     ["placeholder", "{chat_history}"],
     ["human", "{input}"],
     ["placeholder", "{agent_scratchpad}"],
@@ -79,8 +82,9 @@ export const createAgent = (
     throw new Error("Unsupported model");
   }
 
+  const wallet = new Wallet(walletProvider.getPrivateKey());
   const tools = createTools(walletProvider);
-  const prompt = createPrompt(walletProvider.getNetwork());
+  const prompt = createPrompt(walletProvider.getNetwork(), wallet.address);
 
   const agent = createToolCallingAgent({
     llm: selectedModel,
