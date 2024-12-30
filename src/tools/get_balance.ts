@@ -26,21 +26,26 @@ export const GetBalanceToolDefinition = {
   schema: BalanceParamsSchema,
 };
 
-export const getBalance: WalletToolFn<GetBalanceParams> = async (
-  privateKey,
-  network,
-  params
-) => {
+export type GetBalanceResult = {
+  status: "success" | "failed";
+  balance: string;
+  symbol: string;
+};
+
+export const getBalance: WalletToolFn<
+  GetBalanceParams,
+  GetBalanceResult
+> = async (privateKey, network, params) => {
   const provider = makeNetworkProvider(network);
 
   if (!params.token) {
     console.log("[getBalance]: getting native currency balance");
     const balance = await provider.getBalance(params.address);
-    return JSON.stringify({
+    return {
       status: "success",
       balance: formatEther(balance),
       symbol: "ETH",
-    });
+    };
   }
 
   if (!isAddress(params.token)) {
@@ -60,9 +65,9 @@ export const getBalance: WalletToolFn<GetBalanceParams> = async (
     token.symbol(),
   ]);
 
-  return JSON.stringify({
+  return {
     status: "success",
     balance: formatUnits(balance, decimals),
     symbol,
-  });
+  };
 };

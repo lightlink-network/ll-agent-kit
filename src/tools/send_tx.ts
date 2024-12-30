@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { makeNetworkProvider } from "../network.js";
-import type { WalletToolFn } from "./tool.js";
+import type { TxResult, WalletToolFn } from "./tool.js";
 import { parseEther, Wallet } from "ethers";
 
 export const SendTxParamsSchema = z.object({
@@ -19,7 +19,7 @@ export const SendTxToolDefinition = {
   schema: SendTxParamsSchema,
 };
 
-export const sendTx: WalletToolFn<SendTxParams> = async (
+export const sendTx: WalletToolFn<SendTxParams, TxResult> = async (
   privateKey,
   network,
   params
@@ -34,8 +34,8 @@ export const sendTx: WalletToolFn<SendTxParams> = async (
   });
   await tx.wait();
 
-  return JSON.stringify({
+  return {
     status: "success",
     txHash: tx.hash,
-  });
+  };
 };

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { makeNetworkProvider } from "../network.js";
-import type { WalletToolFn } from "./tool.js";
+import type { TxResult, WalletToolFn } from "./tool.js";
 import { Contract, parseEther, parseUnits, Wallet } from "ethers";
 import { ERC20ABI } from "../abis/erc20.js";
 
@@ -23,7 +23,7 @@ export const TransferToolDefinition = {
   schema: TransferParamsSchema,
 };
 
-export const transfer: WalletToolFn<TransferParams> = async (
+export const transfer: WalletToolFn<TransferParams, TxResult> = async (
   privateKey,
   network,
   params
@@ -42,10 +42,10 @@ export const transfer: WalletToolFn<TransferParams> = async (
     await tx.wait();
 
     // return the transaction hash
-    return JSON.stringify({
+    return {
       status: "success",
       txHash: tx.hash,
-    });
+    };
   }
 
   // get the token contract
@@ -64,8 +64,8 @@ export const transfer: WalletToolFn<TransferParams> = async (
   await tx.wait();
 
   // return the transaction hash
-  return JSON.stringify({
+  return {
     status: "success",
     txHash: tx.hash,
-  });
+  };
 };

@@ -20,11 +20,15 @@ export const CallContractToolDefinition = {
   schema: CallContractParamsSchema,
 };
 
-export const callContract: WalletToolFn<CallContractParams> = async (
-  privateKey,
-  network,
-  params
-) => {
+export type CallContractResult = {
+  status: "success" | "failed";
+  result: any;
+};
+
+export const callContract: WalletToolFn<
+  CallContractParams,
+  CallContractResult
+> = async (privateKey, network, params) => {
   const provider = makeNetworkProvider(network);
   const wallet = new Wallet(privateKey, provider);
 
@@ -33,8 +37,8 @@ export const callContract: WalletToolFn<CallContractParams> = async (
     data: params.calldata,
   });
 
-  return JSON.stringify({
+  return {
     status: "success",
     result,
-  });
+  };
 };
