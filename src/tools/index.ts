@@ -6,6 +6,10 @@ import { transfer, TransferToolDefinition } from "./transfer.js";
 import { callContract, CallContractToolDefinition } from "./call_contract.js";
 import type { WalletProvider } from "../wallet.js";
 import { Calculator } from "@langchain/community/tools/calculator";
+import {
+  explorerSearch,
+  ExplorerSearchToolDefinition,
+} from "./explorer_search.js";
 
 // Creates all tools for the agent
 export const createTools = (agent: WalletProvider) => [
@@ -14,6 +18,7 @@ export const createTools = (agent: WalletProvider) => [
   tool(asJson(withWallet(agent, callContract)), CallContractToolDefinition),
   tool(asJson(withWallet(agent, getBalance)), GetBalanceToolDefinition),
   tool(asJson(withWallet(agent, transfer)), TransferToolDefinition),
+  tool(asJson(withWallet(agent, explorerSearch)), ExplorerSearchToolDefinition),
 ];
 
 export const asJson = <T, R>(fn: (params: T) => Promise<R>) => {
