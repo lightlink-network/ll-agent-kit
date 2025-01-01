@@ -18,5 +18,7 @@ console.log(`[LLAgent]: `, await chat.say("What is my name?"));
 console.log("\n");
 console.log(`[LLAgent]: `, await chat.say("How much balance do I have?"));
 console.log("\n");
-console.log(`[LLAgent]: `, await chat.say("How much USDT do I have?"));
+console.log(`[LLAgent]: `, await chat.say("Do I have any USDT?"));
+console.log("\n");
+console.log(`[LLAgent]: `, await chat.say("How is the network doing?"));
 console.log("\n");
