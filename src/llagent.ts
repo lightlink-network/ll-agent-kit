@@ -10,6 +10,7 @@ import {
   callContract,
   type CallContractParams,
 } from "./tools/call_contract.js";
+import type { IterableReadableStream } from "@langchain/core/utils/stream";
 
 export interface LLAgentConfig extends AgentOptions {
   privateKey: string;
@@ -36,6 +37,13 @@ export class LLAgent {
     const response = await this.agent.invoke({ input });
 
     return response;
+  }
+
+  async stream(input: string) {
+    console.log("[LLAgent:execute] 💬 '" + input + "'");
+    return (await this.agent.stream({
+      input,
+    })) as IterableReadableStream<AgentStreamChunk>;
   }
 
   async transfer(params: TransferParams) {
@@ -69,4 +77,20 @@ export class LLAgent {
       params
     );
   }
+}
+
+export interface AgentStreamChunk {
+  intermediateSteps?: AgentStreamChunkStep[];
+  output?: string;
+}
+
+export interface AgentStreamChunkStep {
+  action: {
+    tool?: string;
+    toolInput?: Record<string, any>;
+    toolCallId?: string;
+    log: string;
+    messageLog: any[];
+  };
+  observation: string;
 }
