@@ -9,6 +9,8 @@ import type { AgentExecutor } from "langchain/agents";
 import { InMemoryChatMessageHistory } from "@langchain/core/chat_history";
 import type { ChainValues } from "@langchain/core/utils/types";
 import { RunnableWithMessageHistory } from "@langchain/core/runnables";
+import type { StreamEvent } from "@langchain/core/tracers/log_stream";
+import type { IterableReadableStream } from "@langchain/core/utils/stream";
 
 export class LLChatSession {
   private agent: AgentExecutor;
@@ -34,7 +36,7 @@ export class LLChatSession {
    */
   async say(message: string) {
     const result = await this.execute(new HumanMessage(message));
-    return result.output;
+    return result.output as string;
   }
 
   /**
@@ -69,6 +71,31 @@ export class LLChatSession {
     );
 
     return result as ChainValues;
+  }
+
+  async stream(...messages: BaseMessage[]) {
+    if (messages.length === 0) throw new Error("No messages provided");
+
+    // add all but the last message to the history
+    for (let i = 0; i < messages.length - 1; i++) {
+      const msg = messages[i];
+      if (msg) {
+        await this.history.addMessage(msg);
+      }
+    }
+
+    // get the last message
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) throw new Error("No last message provided");
+
+    const stream: IterableReadableStream<StreamEvent> = this.chain.streamEvents(
+      {
+        input: lastMessage,
+      },
+      { configurable: { sessionId: "unused" }, version: "v2" }
+    );
+
+    return stream;
   }
 
   getHistory() {
