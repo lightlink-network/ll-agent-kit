@@ -10,6 +10,7 @@ import {
   explorerSearch,
   ExplorerSearchToolDefinition,
 } from "./explorer_search.js";
+import { networkStats, NetworkStatsToolDefinition } from "./network_stats.js";
 
 // Creates all tools for the agent
 export const createTools = (agent: WalletProvider) => [
@@ -19,6 +20,7 @@ export const createTools = (agent: WalletProvider) => [
   tool(asJson(withWallet(agent, getBalance)), GetBalanceToolDefinition),
   tool(asJson(withWallet(agent, transfer)), TransferToolDefinition),
   tool(asJson(withWallet(agent, explorerSearch)), ExplorerSearchToolDefinition),
+  tool(asJson(withWallet(agent, networkStats)), NetworkStatsToolDefinition),
 ];
 
 export const asJson = <T, R>(fn: (params: T) => Promise<R>) => {
