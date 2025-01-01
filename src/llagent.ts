@@ -2,7 +2,6 @@ import type { AgentExecutor } from "langchain/agents";
 import { createAgent, type AgentOptions } from "./agent.js";
 import type { WalletProvider } from "./wallet.js";
 import type { Network } from "./network.js";
-import type { z } from "zod";
 import { transfer, type TransferParams } from "./tools/transfer.js";
 import { getBalance, type GetBalanceParams } from "./tools/get_balance.js";
 import { sendTx, type SendTxParams } from "./tools/send_tx.js";

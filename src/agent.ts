@@ -8,6 +8,9 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { createTools } from "./tools/index.js";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { Wallet } from "ethers";
+import type { StructuredToolInterface } from "@langchain/core/tools";
+import type { z } from "zod";
+import type { ToolDefinition } from "@langchain/core/language_models/base";
 
 const createSystemMessage = (network: Network, address: string) =>
   new SystemMessage(
@@ -40,10 +43,14 @@ export const models = [
   "claude-3-5-haiku-latest",
 ];
 
+type ZodObjectAny = z.ZodObject<any, any, any, any>;
+
 export interface AgentOptions {
   model: (typeof models)[number];
   openAiApiKey?: string;
   anthropicApiKey?: string;
+  tools?: ToolDefinition[] | StructuredToolInterface[];
+  useDefaultTools?: boolean;
 }
 
 export const createAgent = (
@@ -54,6 +61,8 @@ export const createAgent = (
   if (!models.includes(opts.model)) {
     throw new Error(`Invalid model: ${opts.model}`);
   }
+
+  const useDefaultTools = opts.useDefaultTools ?? true;
 
   console.log("[createAgent] Creating agent with model:", opts.model);
   let selectedModel: BaseChatModel | undefined;
@@ -83,8 +92,15 @@ export const createAgent = (
   }
 
   const wallet = new Wallet(walletProvider.getPrivateKey());
-  const tools = createTools(walletProvider);
   const prompt = createPrompt(walletProvider.getNetwork(), wallet.address);
+
+  // Create tools
+  const tools = [
+    ...(opts.tools ?? []),
+  ] as StructuredToolInterface<ZodObjectAny>[];
+  if (useDefaultTools) {
+    tools.push(...createTools(walletProvider));
+  }
 
   const agent = createToolCallingAgent({
     llm: selectedModel,
