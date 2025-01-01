@@ -1,6 +1,5 @@
 import "dotenv/config";
-import { LLAgent } from "../src/llagent.js";
-import { NETWORKS } from "../src/network.js";
+import { LLAgent, NETWORKS } from "../dist/index.js";
 
 console.log("\n");
 console.log("[DEMO] Creating agent");
