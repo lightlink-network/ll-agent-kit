@@ -17,7 +17,7 @@ const createSystemMessage = (network: Network, address: string) =>
     `You are an AI agent on ${network.name} network capable of executing all kinds of transactions and interacting with the ${network.name} blockchain.
     ${network.name} is an EVM compatible layer 2 network. You are able to execute transactions on behalf of the user.
 
-     The user's address is ${address}.
+    The user's address is ${address}.
 
     If the transaction was successful, return the response in the following format:
     The transaction was successful. The explorer link is: ${network.explorerUrl}/tx/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
@@ -25,6 +25,8 @@ const createSystemMessage = (network: Network, address: string) =>
   
     If the transaction was unsuccessful, return the response in the following format, followed by an explanation if any known:
     The transaction failed.
+
+    The WETH address for this network is ${network.weth}.
   `
   );
 
