@@ -1,27 +1,29 @@
 import { z } from "zod";
 import { makeNetworkProvider } from "../network.js";
 import type { WalletToolFn } from "./tool.js";
-import { Wallet } from "ethers";
-
-export const CallContractParamsSchema = z.object({
-  target: z.string().describe("The target of the contract call"),
-  calldata: z
-    .string()
-    .describe(
-      "The calldata to send as hex, typically The hash of the method signature and encoded parameters."
-    ),
-});
-
-export type CallContractParams = z.infer<typeof CallContractParamsSchema>;
+import { Contract, Wallet } from "ethers";
+import type { Result } from "ethers";
 
 export const CallContractToolDefinition = {
   name: "call_contract",
-  description: "Call any contract with raw calldata",
-  schema: CallContractParamsSchema,
+  description: "Call any contract using the abi, method name and parameters",
+  schema: z.object({
+    target: z.string().describe("The target of the contract call"),
+    abi: z.string().describe("The abi of the contract, as a json array"),
+    method: z.string().describe("The method name to call"),
+    params: z
+      .array(z.string())
+      .describe("The parameters to pass to the method"),
+  }),
 };
+
+export type CallContractParams = z.infer<
+  typeof CallContractToolDefinition.schema
+>;
 
 export type CallContractResult = {
   status: "success" | "failed";
+  error?: string;
   result: any;
 };
 
@@ -32,11 +34,24 @@ export const callContract: WalletToolFn<
   const provider = makeNetworkProvider(network);
   const wallet = new Wallet(privateKey, provider);
 
-  console.log("[tool:call_contract]: calling contract", params);
-  const result = await wallet.call({
-    to: params.target,
-    data: params.calldata,
-  });
+  console.log(
+    "[tool:call_contract]: calling contract",
+    params.target,
+    params.method,
+    params.params
+  );
+  const contract = new Contract(params.target, params.abi, wallet);
+
+  const method = contract.getFunction(params.method);
+  if (!method) {
+    return {
+      status: "failed",
+      error: "Method not found",
+      result: "",
+    };
+  }
+
+  const result: Result = await method(...params.params);
 
   return {
     status: "success",
