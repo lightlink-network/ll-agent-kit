@@ -17,6 +17,8 @@ export PRIVATE_KEY=<your lightlink private key>
 export OPENAI_API_KEY=<your openai api key>
 ```
 
+(You can also set the environment variables in a `.env` file, see `.env.example` for more information)
+
 Then run the demo:
 
 ```bash
