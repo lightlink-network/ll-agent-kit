@@ -1,7 +1,7 @@
 {
-  "name": "llagent",
-  "version": "0.0.1",
-  "description": "",
+  "name": "ll-agent-kit",
+  "version": "0.0.2",
+  "description": "LL Agent Kit",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -9,8 +9,7 @@
     "build": "tsup",
     "demo": "node --loader ts-node/esm demo/index.ts",
     "demo:stream": "node --loader ts-node/esm demo/stream.ts",
-    "demo:chat": "node --loader ts-node/esm demo/chat.ts",
-    "postinstall": "npm run build"
+    "demo:chat": "node --loader ts-node/esm demo/chat.ts"
   },
   "keywords": [],
   "author": "",

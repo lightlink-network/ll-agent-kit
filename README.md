@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-npm install --save https://github.com/lightlink-network/llagent-demo.git
+npm install --save https://github.com/lightlink-network/ll-agent-kit.git
 ```
 
 ## Demo
