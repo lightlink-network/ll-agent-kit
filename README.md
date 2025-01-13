@@ -1,5 +1,9 @@
 # LightLink Agent (example)
 
+LightLink Agent Kit is a library for building agents that can interact with the LightLink network. LightLink Agent Kit is built on top of LangChain.
+
+See the live chat demo [here](https://ll-agentkit-chat-demo.vercel.app).
+
 ## Installation
 
 ```bash
