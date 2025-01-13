@@ -9,7 +9,8 @@
     "build": "tsup",
     "demo": "node --loader ts-node/esm demo/index.ts",
     "demo:stream": "node --loader ts-node/esm demo/stream.ts",
-    "demo:chat": "node --loader ts-node/esm demo/chat.ts"
+    "demo:chat": "node --loader ts-node/esm demo/chat.ts",
+    "postinstall": "npm run build"
   },
   "keywords": [],
   "author": "",
