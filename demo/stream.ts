@@ -3,12 +3,11 @@ import { LLAgent, NETWORKS } from "../dist/index.js";
 
 console.log("\n");
 console.log("[DEMO] Creating agent");
-const agent = new LLAgent({
-  privateKey: process.env.PRIVATE_KEY ?? "",
-  network: NETWORKS.PegasusTestnet,
-  model: "gpt-4o",
-  openAiApiKey: process.env.OPENAI_API_KEY,
-});
+const agent = await LLAgent.fromPrivateKey(
+  process.env.PRIVATE_KEY ?? "",
+  NETWORKS.PegasusTestnet,
+  { model: "gpt-4o", openAiApiKey: process.env.OPENAI_API_KEY }
+);
 
 // get message from user
 let message: string =

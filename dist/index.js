@@ -2571,19 +2571,20 @@ var LLChatSession = class {
 };
 
 // src/llagent.ts
-import { Wallet as Wallet9 } from "ethers";
-var LLAgent = class {
+import "ethers";
+var LLAgent = class _LLAgent {
   agent;
   walletProvider;
   opts;
   constructor(cfg) {
-    this.walletProvider = new PrivateKeyWalletProvider(
-      cfg.privateKey,
-      cfg.network
-    );
-    const address = new Wallet9(cfg.privateKey).address;
+    this.walletProvider = cfg.walletProvider;
     this.opts = cfg;
-    this.agent = createAgent(address, this.walletProvider, cfg);
+    this.agent = createAgent(cfg.address, this.walletProvider, cfg);
+  }
+  static async fromPrivateKey(privateKey, network, opts) {
+    const walletProvider = new PrivateKeyWalletProvider(privateKey, network);
+    const address = await walletProvider.getAddress();
+    return new _LLAgent({ ...opts, address, walletProvider });
   }
   /**
    * Execute the agent with a given input.

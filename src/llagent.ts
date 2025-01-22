@@ -20,8 +20,8 @@ import type { TxResult } from "./tools/tool.js";
 import { Wallet } from "ethers";
 
 export interface LLAgentConfig extends AgentOptions {
-  privateKey: string;
-  network: Network;
+  address: string;
+  walletProvider: WalletProvider;
 }
 
 export class LLAgent {
@@ -30,16 +30,19 @@ export class LLAgent {
   private opts: AgentOptions;
 
   constructor(cfg: LLAgentConfig) {
-    this.walletProvider = new PrivateKeyWalletProvider(
-      cfg.privateKey,
-      cfg.network
-    );
-
-    // get address
-    const address = new Wallet(cfg.privateKey).address;
-
+    this.walletProvider = cfg.walletProvider;
     this.opts = cfg;
-    this.agent = createAgent(address, this.walletProvider, cfg);
+    this.agent = createAgent(cfg.address, this.walletProvider, cfg);
+  }
+
+  static async fromPrivateKey(
+    privateKey: string,
+    network: Network,
+    opts: AgentOptions
+  ) {
+    const walletProvider = new PrivateKeyWalletProvider(privateKey, network);
+    const address = await walletProvider.getAddress();
+    return new LLAgent({ ...opts, address, walletProvider });
   }
 
   /**
