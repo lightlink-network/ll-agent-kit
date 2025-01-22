@@ -2268,31 +2268,15 @@ var swapExactInput = async (privateKey, network, params) => {
 
 // src/tools/resolve_ens_domain.ts
 var import_zod9 = require("zod");
-var import_ethers15 = require("ethers");
-var import_core2 = require("@web3-name-sdk/core");
 
 // src/ens/index.ts
-var import_ethers14 = require("ethers");
-var import_utils4 = require("@web3-name-sdk/core/utils");
+var import_ethers15 = require("ethers");
+var import_utils5 = require("@web3-name-sdk/core/utils");
 var import_core = require("@web3-name-sdk/core");
-var resolveEnsName = async (name) => {
-  const tld = name.split(".").pop();
-  const normalizedDomain = (0, import_utils4.normalize)(name);
-  let address = null;
-  switch (tld) {
-    case LL_TLD_INFO.tld:
-      (0, import_utils4.validateName)((0, import_utils4.normalize)(tld));
-      address = await resolveLLDomain(normalizedDomain);
-      break;
-    default:
-      const web3Name = (0, import_core.createWeb3Name)();
-      address = await web3Name.getAddress(name);
-  }
-  if (!address || address === "0x0000000000000000000000000000000000000000") {
-    return null;
-  }
-  return address;
-};
+
+// src/ens/lldomain.ts
+var import_utils4 = require("@web3-name-sdk/core/utils");
+var import_ethers14 = require("ethers");
 var ENSRegistryABI = [
   "function resolver(bytes32 node) external view returns (address)"
 ];
@@ -2312,9 +2296,21 @@ var resolveLLDomain = async (normalizedDomain) => {
   const ensAddress = NETWORKS.PhoenixMainnet.ens.address;
   const nameHash = (0, import_utils4.tldNamehash)(normalizedDomain, LL_TLD_INFO.identifier);
   const ensRegistry = new import_ethers14.Contract(ensAddress, ENSRegistryABI, provider);
-  const resolver = await ensRegistry.resolver(nameHash);
-  const resolverContract = new import_ethers14.Contract(resolver, ResolverABI, provider);
-  const address = await resolverContract.addr(nameHash);
+  const resolverAddress = await ensRegistry.resolver(nameHash);
+  const ensResolver = new import_ethers14.Contract(resolverAddress, ResolverABI, provider);
+  const address = await ensResolver.addr(nameHash);
+  return address;
+};
+
+// src/ens/index.ts
+var resolveEnsName = async (name) => {
+  const tld = name.split(".").pop();
+  const normalizedDomain = (0, import_utils5.normalize)(name);
+  if (tld === "ll") {
+    return resolveLLDomain(normalizedDomain);
+  }
+  const web3Name = (0, import_core.createWeb3Name)();
+  const address = await web3Name.getAddress(name);
   return address;
 };
 
@@ -2329,7 +2325,7 @@ var ResolveENSDomainToolDefinition = {
 var resolveENSDomain = async (privateKey, network, params) => {
   console.log(`[resolve_ens_domain] Resolving '${params.domain}'`);
   const address = await resolveEnsName(params.domain);
-  if (!address) {
+  if (!address || address === "0x0000000000000000000000000000000000000000") {
     return {
       status: "failed",
       error: "ENS domain not found"

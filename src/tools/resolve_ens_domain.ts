@@ -1,8 +1,5 @@
 import { z } from "zod";
 import type { WalletToolFn } from "./tool.js";
-import { makeNetworkProvider, NETWORKS, type Network } from "../network.js";
-import { Contract, EnsPlugin, EnsResolver, namehash } from "ethers";
-import { createWeb3Name } from "@web3-name-sdk/core";
 import { resolveEnsName } from "../ens/index.js";
 
 export const ResolveENSDomainToolDefinition = {
@@ -33,7 +30,7 @@ export const resolveENSDomain: WalletToolFn<
   console.log(`[resolve_ens_domain] Resolving '${params.domain}'`);
 
   const address = await resolveEnsName(params.domain);
-  if (!address) {
+  if (!address || address === "0x0000000000000000000000000000000000000000") {
     return {
       status: "failed",
       error: "ENS domain not found",
