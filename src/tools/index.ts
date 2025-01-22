@@ -44,6 +44,8 @@ export const createTools = (agent: WalletProvider) => [
   ),
 ];
 
+// Wraps a tool function in a JSON serializer, so that the result can be
+// read by the agent. (Also handles bigint values)
 export const json = <T, R>(fn: (params: T) => Promise<R>) => {
   return async (params: T) =>
     JSON.stringify(await fn(params), (k, v) => {
@@ -55,6 +57,8 @@ export const json = <T, R>(fn: (params: T) => Promise<R>) => {
     });
 };
 
+// Wraps a tool function in an error handler, which format the error
+// as text for the agent to read.
 export const err = (fn: (...args: any[]) => Promise<any>) => {
   return async (...args: any[]) => {
     try {
