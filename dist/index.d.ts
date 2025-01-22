@@ -3,7 +3,7 @@ import * as _langchain_core_utils_types from '@langchain/core/utils/types';
 import { ChainValues } from '@langchain/core/utils/types';
 import { StructuredToolInterface } from '@langchain/core/tools';
 import { ToolDefinition } from '@langchain/core/language_models/base';
-import { Networkish } from 'ethers';
+import { Networkish, Transaction, TransactionRequest, TransactionResponse } from 'ethers';
 import { JsonRpcProvider } from 'ethers/providers';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { ChatMessageHistory } from 'langchain/memory';
@@ -31,6 +31,13 @@ declare const NETWORKS: {
     PhoenixMainnet: Network;
     PegasusTestnet: Network;
 };
+
+interface WalletProvider {
+    signTransaction: (tx: Transaction) => Promise<string>;
+    sendTransaction: (tx: TransactionRequest) => Promise<TransactionResponse>;
+    getAddress: () => Promise<string>;
+    getNetworkInfo: () => Network;
+}
 
 type TxResult = {
     status: "success" | "failed";
@@ -153,14 +160,15 @@ declare class LLChatSession {
 }
 
 interface LLAgentConfig extends AgentOptions {
-    privateKey: string;
-    network: Network;
+    address: string;
+    walletProvider: WalletProvider;
 }
 declare class LLAgent {
     private agent;
     private walletProvider;
     private opts;
     constructor(cfg: LLAgentConfig);
+    static fromPrivateKey(privateKey: string, network: Network, opts: AgentOptions): Promise<LLAgent>;
     /**
      * Execute the agent with a given input.
      * @returns An object containing the agent's response.

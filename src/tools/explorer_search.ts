@@ -29,9 +29,9 @@ export type ExplorerSearchResult = {
 export const explorerSearch: WalletToolFn<
   ExplorerSearchParams,
   ExplorerSearchResult
-> = async (privateKey, network, params) => {
+> = async (walletProvider, params) => {
   console.log("[tool:explorer_search]: searching for", params.query);
-  const url = `${network.explorerUrl}/api/v2/search?q=${params.query}`;
+  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/search?q=${params.query}`;
   const response = await fetch(url);
   const data = (await response.json()) as any;
 

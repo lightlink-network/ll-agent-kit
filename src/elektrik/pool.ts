@@ -1,10 +1,7 @@
-import type { Token } from "@elektrik/sdk-core";
-import { Contract, type JsonRpcProvider } from "ethers";
-import type { Network } from "../network.js";
-import { computePoolAddress, FeeAmount } from "@uniswap/v3-sdk";
+import { Contract, type Provider } from "ethers";
+import { FeeAmount } from "@uniswap/v3-sdk";
 import { IElektrikFactoryABI } from "../abis/elektrikFactory.js";
 import { requireMethods } from "../utils.js";
-import type { Provider } from "ethers";
 import { IElektrikPoolABI } from "../abis/eletrikPool.js";
 
 const _findPoolAddress = async (

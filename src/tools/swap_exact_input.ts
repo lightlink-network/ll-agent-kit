@@ -29,24 +29,23 @@ type SwapParams = z.infer<typeof SwapExactInputToolDefinition.schema>;
 export interface SwapResult extends TxResult {}
 
 export const swapExactInput: WalletToolFn<SwapParams, SwapResult> = async (
-  privateKey,
-  network,
+  wallet,
   params
 ) => {
+  const network = wallet.getNetworkInfo();
   if (!network.elektrik)
     throw new Error("Elektrik DEX not setup for this network");
   if (!network.permit2) throw new Error("Permit2 not setup for this network");
-
   const provider = makeNetworkProvider(network);
-  const wallet = new Wallet(privateKey, provider);
+  const senderAddress = await wallet.getAddress();
 
   // parse the amount
-  const tokenIn = new Contract(params.fromToken, ERC20ABI, wallet);
+  const tokenIn = new Contract(params.fromToken, ERC20ABI, provider);
   const decimals = await tokenIn.decimals!();
   const amountIn = parseUnits(params.amount, decimals);
 
   // ensure enough balance
-  const balance = await tokenIn.balanceOf!(wallet.address);
+  const balance = await tokenIn.balanceOf!(senderAddress);
   if (balance < amountIn) {
     throw new Error(
       `Insufficient balance in input token ${params.fromToken} for amount ${params.amount}`
@@ -54,6 +53,7 @@ export const swapExactInput: WalletToolFn<SwapParams, SwapResult> = async (
   }
 
   const tx = await swapExactIn(
+    provider,
     wallet,
     network.permit2,
     network.elektrik.factoryAddress,

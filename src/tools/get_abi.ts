@@ -20,8 +20,7 @@ interface GetAbiResult {
 }
 
 export const getAbi: WalletToolFn<GetAbiToolParams, GetAbiResult> = async (
-  privateKey,
-  network,
+  walletProvider,
   params
 ) => {
   if (!isAddress(params.address)) {
@@ -32,7 +31,7 @@ export const getAbi: WalletToolFn<GetAbiToolParams, GetAbiResult> = async (
     };
   }
 
-  const url = `${network.explorerUrl}/api/v2/smart-contracts/${params.address}`;
+  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/smart-contracts/${params.address}`;
 
   const response = await fetch(url);
   const data = (await response.json()) as any;

@@ -24,10 +24,8 @@ export type NetworkStatsResult = {
 export const networkStats: WalletToolFn<
   NetworkStatsParams,
   NetworkStatsResult
-> = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
-
-  const url = `${network.explorerUrl}/api/v2/stats`;
+> = async (walletProvider, params) => {
+  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/stats`;
   const response = await fetch(url);
   const data = (await response.json()) as any;
 

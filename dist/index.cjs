@@ -37,8 +37,8 @@ var import_anthropic = require("@langchain/anthropic");
 var import_tools2 = require("@langchain/core/tools");
 
 // src/tools/tool.ts
-var withWallet = (agent, fn) => {
-  return (params) => fn(agent.getPrivateKey(), agent.getNetwork(), params);
+var withWallet = (wallet, fn) => {
+  return (params) => fn(wallet, params);
 };
 
 // src/tools/send_tx.ts
@@ -92,11 +92,9 @@ var SendTxToolDefinition = {
   description: "Send a raw ethereum transaction",
   schema: SendTxParamsSchema
 };
-var sendTx = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
-  const wallet = new import_ethers2.Wallet(privateKey, provider);
+var sendTx = async (walletProvider, params) => {
   console.log("[tool:send_tx]: sending transaction", params);
-  const tx = await wallet.sendTransaction({
+  const tx = await walletProvider.sendTransaction({
     to: params.to,
     value: params.amount ? (0, import_ethers2.parseEther)(params.amount) : void 0,
     data: params.calldata
@@ -349,8 +347,8 @@ var GetBalanceToolDefinition = {
   description: "Retrieve the token balance or native currency balance for a wallet address",
   schema: BalanceParamsSchema
 };
-var getBalance = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
+var getBalance = async (walletProvider, params) => {
+  const provider = makeNetworkProvider(walletProvider.getNetworkInfo());
   if (!params.token) {
     console.log("[tool:get_balance]: getting native currency balance");
     const balance2 = await provider.getBalance(params.address);
@@ -395,9 +393,8 @@ var TransferToolDefinition = {
   description: "Transfer any token or native currency to a wallet",
   schema: TransferParamsSchema
 };
-var transfer = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
-  const wallet = new import_ethers4.Wallet(privateKey, provider);
+var transfer = async (wallet, params) => {
+  const provider = makeNetworkProvider(wallet.getNetworkInfo());
   if (!params.token) {
     console.log("[tool:transfer]: transferring native currency", params);
     const tx2 = await wallet.sendTransaction({
@@ -415,10 +412,14 @@ var transfer = async (privateKey, network, params) => {
   if (!token.transfer || !token.decimals) {
     throw new Error("Internal error: Incorrect ERC20 ABI");
   }
-  const tx = await token.transfer(
+  const callData = token.interface.encodeFunctionData("transfer", [
     params.to,
     (0, import_ethers4.parseUnits)(params.amount.toString(), await token.decimals())
-  );
+  ]);
+  const tx = await wallet.sendTransaction({
+    to: params.token,
+    data: callData
+  });
   await tx.wait();
   return {
     status: "success",
@@ -439,16 +440,15 @@ var CallContractToolDefinition = {
     params: import_zod4.z.array(import_zod4.z.string()).describe("The parameters to pass to the method")
   })
 };
-var callContract = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
-  const wallet = new import_ethers5.Wallet(privateKey, provider);
+var callContract = async (walletProvider, params) => {
+  const provider = makeNetworkProvider(walletProvider.getNetworkInfo());
   console.log(
     "[tool:call_contract]: calling contract",
     params.target,
     params.method,
     params.params
   );
-  const contract = new import_ethers5.Contract(params.target, params.abi, wallet);
+  const contract = new import_ethers5.Contract(params.target, params.abi, provider);
   const method = contract.getFunction(params.method);
   if (!method) {
     return {
@@ -477,9 +477,9 @@ var ExplorerSearchToolDefinition = {
     query: import_zod5.z.string().describe("The query to search for")
   })
 };
-var explorerSearch = async (privateKey, network, params) => {
+var explorerSearch = async (walletProvider, params) => {
   console.log("[tool:explorer_search]: searching for", params.query);
-  const url = `${network.explorerUrl}/api/v2/search?q=${params.query}`;
+  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/search?q=${params.query}`;
   const response = await fetch(url);
   const data = await response.json();
   if (data.items == void 0) {
@@ -502,9 +502,8 @@ var NetworkStatsToolDefinition = {
   description: "Get stats about the network including: total blocks, txns, avg blocktime, utilization and gas prices etc.",
   schema: import_zod6.z.object({})
 };
-var networkStats = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
-  const url = `${network.explorerUrl}/api/v2/stats`;
+var networkStats = async (walletProvider, params) => {
+  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/stats`;
   const response = await fetch(url);
   const data = await response.json();
   return { status: "success", data };
@@ -520,7 +519,7 @@ var GetAbiToolDefinition = {
     address: import_zod7.z.string().describe("The address of the contract")
   })
 };
-var getAbi = async (privateKey, network, params) => {
+var getAbi = async (walletProvider, params) => {
   if (!(0, import_ethers8.isAddress)(params.address)) {
     return {
       status: "failed",
@@ -528,7 +527,7 @@ var getAbi = async (privateKey, network, params) => {
       abi: "[]"
     };
   }
-  const url = `${network.explorerUrl}/api/v2/smart-contracts/${params.address}`;
+  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/smart-contracts/${params.address}`;
   const response = await fetch(url);
   const data = await response.json();
   if (data.abi == void 0 || data.abi == "" || data.abi == "[]") {
@@ -551,23 +550,6 @@ var import_zod8 = require("zod");
 
 // src/elektrik/universalRouter.ts
 var import_ethers9 = require("ethers");
-
-// src/utils.ts
-var requireMethods = (contract, ...methods) => {
-  const funcs = [];
-  for (const method of methods) {
-    const func = contract.getFunction(method);
-    if (!func) {
-      throw new Error(
-        `Method ${method} not found on contract ${contract.address}`
-      );
-    }
-    funcs.push(func);
-  }
-  return funcs;
-};
-
-// src/elektrik/universalRouter.ts
 var import_ethers10 = require("ethers");
 
 // src/abis/elektrikRouter.ts
@@ -788,6 +770,7 @@ var UniversalRouter = class {
    */
   async swapExactIn(wallet, amountIn, amountOutMin, path) {
     const SWAP_EXACT_IN = "0x00";
+    const senderAddress = await wallet.getAddress();
     const v3SwapRoute = import_ethers10.ethers.solidityPacked(
       ["address", "uint24", "address"],
       [path.tokenIn, path.fee, path.tokenOut]
@@ -795,13 +778,16 @@ var UniversalRouter = class {
     const inputs = import_ethers10.AbiCoder.defaultAbiCoder().encode(
       // Encode the inputs for V3_SWAP_EXACT_IN
       ["address", "uint256", "uint256", "bytes", "bool"],
-      [wallet.address, amountIn, amountOutMin, v3SwapRoute, true]
+      [senderAddress, amountIn, amountOutMin, v3SwapRoute, true]
     );
-    const [executeMethod] = requireMethods(
-      this.universalRouter.connect(wallet),
-      "execute"
+    const callData = await this.universalRouter.interface.encodeFunctionData(
+      "execute",
+      [SWAP_EXACT_IN, [inputs]]
     );
-    const tx = await executeMethod(SWAP_EXACT_IN, [inputs]);
+    const tx = await wallet.sendTransaction({
+      to: await this.universalRouter.getAddress(),
+      data: callData
+    });
     await tx.wait();
     return tx;
   }
@@ -947,6 +933,21 @@ var IElektrikFactoryABI = [
     type: "function"
   }
 ];
+
+// src/utils.ts
+var requireMethods = (contract, ...methods) => {
+  const funcs = [];
+  for (const method of methods) {
+    const func = contract.getFunction(method);
+    if (!func) {
+      throw new Error(
+        `Method ${method} not found on contract ${contract.address}`
+      );
+    }
+    funcs.push(func);
+  }
+  return funcs;
+};
 
 // src/abis/eletrikPool.ts
 var IElektrikPoolABI = [
@@ -2169,53 +2170,70 @@ var Permit2ABI = [
 ];
 
 // src/elektrik/allowance.ts
-async function ensureApproval(wallet, token, target, amount) {
-  const tokenContract = new import_ethers12.Contract(token, ERC20ABI, wallet);
-  const [allowanceMethod, approveMethod] = requireMethods(
-    tokenContract,
-    "allowance",
-    "approve"
-  );
-  let allowance = await allowanceMethod(wallet.address, target);
+async function ensureApproval(provider, wallet, token, target, amount) {
+  const senderAddress = await wallet.getAddress();
+  const tokenContract = new import_ethers12.Contract(token, ERC20ABI, provider);
+  const [allowanceMethod] = requireMethods(tokenContract, "allowance");
+  let allowance = await allowanceMethod(senderAddress, target);
   if (allowance < amount) {
     console.log("Approving token transfer", target, amount);
-    const tx = await approveMethod(target, amount);
+    const callData = await tokenContract.interface.encodeFunctionData(
+      "approve",
+      [target, amount]
+    );
+    const tx = await wallet.sendTransaction({
+      to: token,
+      data: callData
+    });
     await tx.wait();
     allowance = amount;
   }
   return allowance;
 }
-var ensurePermit2 = async (permit2, wallet, token, target, amount) => {
-  await ensureApproval(wallet, token, permit2, amount);
-  const permit2Contract = new import_ethers12.Contract(permit2, Permit2ABI, wallet);
+var ensurePermit2 = async (provider, wallet, permit2, token, target, amount) => {
+  await ensureApproval(provider, wallet, token, permit2, amount);
+  const senderAddress = await wallet.getAddress();
+  const permit2Contract = new import_ethers12.Contract(permit2, Permit2ABI, provider);
   const [allowanceMethod] = requireMethods(permit2Contract, "allowance");
-  const allowance = await allowanceMethod(wallet.address, token, target);
+  const allowance = await allowanceMethod(senderAddress, token, target);
   if (allowance >= amount) {
     return;
   }
-  await approvePermit2(permit2, wallet, token, target, amount);
+  await approvePermit2(provider, wallet, permit2, token, target, amount);
 };
-var approvePermit2 = async (permit2, wallet, token, target, amount) => {
+var approvePermit2 = async (provider, wallet, permit2, token, target, amount) => {
   const ONE_DAY_IN_SECONDS = 60 * 60 * 24;
   const deadline = Math.floor(Date.now() / 1e3) + ONE_DAY_IN_SECONDS;
-  const permit2Contract = new import_ethers12.Contract(permit2, Permit2ABI, wallet);
-  const [approveMethod] = requireMethods(permit2Contract, "approve");
-  const tx = await approveMethod(token, target, amount, deadline);
+  const permit2Contract = new import_ethers12.Contract(permit2, Permit2ABI, provider);
+  const callData = await permit2Contract.interface.encodeFunctionData(
+    "approve",
+    [token, target, amount, deadline]
+  );
+  const tx = await wallet.sendTransaction({
+    to: permit2,
+    data: callData
+  });
   await tx.wait();
   return tx;
 };
 
 // src/elektrik/swap.ts
-var swapExactIn = async (wallet, permit2, factoryAddress, routerAddress, amountIn, tokenIn, tokenOut, slippage) => {
-  if (!wallet.provider) throw new Error("Wallet provider not found");
+var swapExactIn = async (provider, wallet, permit2, factoryAddress, routerAddress, amountIn, tokenIn, tokenOut, slippage) => {
   const poolInfo = await getPoolInfo(
-    await findPoolAddress(factoryAddress, wallet.provider, tokenIn, tokenOut),
-    wallet.provider
+    await findPoolAddress(factoryAddress, provider, tokenIn, tokenOut),
+    provider
   );
   console.log("GOT POOL ADDRESS", poolInfo.address, poolInfo.fee);
   const amountOutMin = 1n;
-  await ensurePermit2(permit2, wallet, tokenIn, routerAddress, amountIn);
-  const router = new universalRouter_default(routerAddress, wallet.provider);
+  await ensurePermit2(
+    provider,
+    wallet,
+    permit2,
+    tokenIn,
+    routerAddress,
+    amountIn
+  );
+  const router = new universalRouter_default(routerAddress, provider);
   const tx = await router.swapExactIn(wallet, amountIn, amountOutMin, {
     tokenIn,
     tokenOut,
@@ -2235,22 +2253,24 @@ var SwapExactInputToolDefinition = {
     slippage: import_zod8.z.number().optional().describe("Slippage tolerance (default: 0.01 for 1%)")
   })
 };
-var swapExactInput = async (privateKey, network, params) => {
+var swapExactInput = async (wallet, params) => {
+  const network = wallet.getNetworkInfo();
   if (!network.elektrik)
     throw new Error("Elektrik DEX not setup for this network");
   if (!network.permit2) throw new Error("Permit2 not setup for this network");
   const provider = makeNetworkProvider(network);
-  const wallet = new import_ethers13.Wallet(privateKey, provider);
-  const tokenIn = new import_ethers13.Contract(params.fromToken, ERC20ABI, wallet);
+  const senderAddress = await wallet.getAddress();
+  const tokenIn = new import_ethers13.Contract(params.fromToken, ERC20ABI, provider);
   const decimals = await tokenIn.decimals();
   const amountIn = (0, import_ethers13.parseUnits)(params.amount, decimals);
-  const balance = await tokenIn.balanceOf(wallet.address);
+  const balance = await tokenIn.balanceOf(senderAddress);
   if (balance < amountIn) {
     throw new Error(
       `Insufficient balance in input token ${params.fromToken} for amount ${params.amount}`
     );
   }
   const tx = await swapExactIn(
+    provider,
     wallet,
     network.permit2,
     network.elektrik.factoryAddress,
@@ -2271,11 +2291,11 @@ var import_zod9 = require("zod");
 
 // src/ens/index.ts
 var import_ethers15 = require("ethers");
-var import_utils5 = require("@web3-name-sdk/core/utils");
+var import_utils4 = require("@web3-name-sdk/core/utils");
 var import_core = require("@web3-name-sdk/core");
 
 // src/ens/lldomain.ts
-var import_utils4 = require("@web3-name-sdk/core/utils");
+var import_utils3 = require("@web3-name-sdk/core/utils");
 var import_ethers14 = require("ethers");
 var ENSRegistryABI = [
   "function resolver(bytes32 node) external view returns (address)"
@@ -2294,7 +2314,7 @@ var LL_TLD_INFO = {
 var resolveLLDomain = async (normalizedDomain) => {
   const provider = makeNetworkProvider(NETWORKS.PhoenixMainnet);
   const ensAddress = NETWORKS.PhoenixMainnet.ens.address;
-  const nameHash = (0, import_utils4.tldNamehash)(normalizedDomain, LL_TLD_INFO.identifier);
+  const nameHash = (0, import_utils3.tldNamehash)(normalizedDomain, LL_TLD_INFO.identifier);
   const ensRegistry = new import_ethers14.Contract(ensAddress, ENSRegistryABI, provider);
   const resolverAddress = await ensRegistry.resolver(nameHash);
   const ensResolver = new import_ethers14.Contract(resolverAddress, ResolverABI, provider);
@@ -2305,7 +2325,7 @@ var resolveLLDomain = async (normalizedDomain) => {
 // src/ens/index.ts
 var resolveEnsName = async (name) => {
   const tld = name.split(".").pop();
-  const normalizedDomain = (0, import_utils5.normalize)(name);
+  const normalizedDomain = (0, import_utils4.normalize)(name);
   if (tld === "ll") {
     return resolveLLDomain(normalizedDomain);
   }
@@ -2322,7 +2342,7 @@ var ResolveENSDomainToolDefinition = {
     domain: import_zod9.z.string()
   })
 };
-var resolveENSDomain = async (privateKey, network, params) => {
+var resolveENSDomain = async (_, params) => {
   console.log(`[resolve_ens_domain] Resolving '${params.domain}'`);
   const address = await resolveEnsName(params.domain);
   if (!address || address === "0x0000000000000000000000000000000000000000") {
@@ -2415,7 +2435,7 @@ var models = [
   "claude-3-5-sonnet-latest",
   "claude-3-5-haiku-latest"
 ];
-var createAgent = (walletProvider, opts) => {
+var createAgent = (address, walletProvider, opts) => {
   if (!models.includes(opts.model)) {
     throw new Error(`Invalid model: ${opts.model}`);
   }
@@ -2442,8 +2462,7 @@ var createAgent = (walletProvider, opts) => {
   if (selectedModel === void 0) {
     throw new Error("Unsupported model");
   }
-  const wallet = new import_ethers16.Wallet(walletProvider.getPrivateKey());
-  const prompt = createPrompt(walletProvider.getNetwork(), wallet.address);
+  const prompt = createPrompt(walletProvider.getNetworkInfo(), address);
   const tools = [
     ...opts.tools ?? []
   ];
@@ -2460,6 +2479,29 @@ var createAgent = (walletProvider, opts) => {
     tools,
     verbose: process.env.VERBOSE === "true"
   });
+};
+
+// src/wallet.ts
+var import_ethers17 = require("ethers");
+var PrivateKeyWalletProvider = class {
+  privateKey;
+  network;
+  constructor(privateKey, network) {
+    this.privateKey = privateKey;
+    this.network = network;
+  }
+  async getAddress() {
+    return await new import_ethers17.Wallet(this.privateKey).getAddress();
+  }
+  async signTransaction(tx) {
+    return await new import_ethers17.Wallet(this.privateKey).signTransaction(tx);
+  }
+  async sendTransaction(tx) {
+    return await new import_ethers17.Wallet(this.privateKey).sendTransaction(tx);
+  }
+  getNetworkInfo() {
+    return this.network;
+  }
 };
 
 // src/llchat.ts
@@ -2554,17 +2596,20 @@ var LLChatSession = class {
 };
 
 // src/llagent.ts
-var LLAgent = class {
+var import_ethers18 = require("ethers");
+var LLAgent = class _LLAgent {
   agent;
   walletProvider;
   opts;
   constructor(cfg) {
-    this.walletProvider = {
-      getPrivateKey: () => cfg.privateKey,
-      getNetwork: () => cfg.network
-    };
+    this.walletProvider = cfg.walletProvider;
     this.opts = cfg;
-    this.agent = createAgent(this.walletProvider, cfg);
+    this.agent = createAgent(cfg.address, this.walletProvider, cfg);
+  }
+  static async fromPrivateKey(privateKey, network, opts) {
+    const walletProvider = new PrivateKeyWalletProvider(privateKey, network);
+    const address = await walletProvider.getAddress();
+    return new _LLAgent({ ...opts, address, walletProvider });
   }
   /**
    * Execute the agent with a given input.
@@ -2598,44 +2643,28 @@ var LLAgent = class {
    * @returns An object containing the transaction hash.
    */
   async transfer(params) {
-    return await transfer(
-      this.walletProvider.getPrivateKey(),
-      this.walletProvider.getNetwork(),
-      params
-    );
+    return await transfer(this.walletProvider, params);
   }
   /**
    * Get the balance of the agent's wallet.
    * @returns An object containing the balance of the wallet.
    */
   async getBalance(params) {
-    return await getBalance(
-      this.walletProvider.getPrivateKey(),
-      this.walletProvider.getNetwork(),
-      params
-    );
+    return await getBalance(this.walletProvider, params);
   }
   /**
    * Send a transaction from the agent's wallet.
    * @returns An object containing the transaction hash.
    */
   async sendTransaction(params) {
-    return await sendTx(
-      this.walletProvider.getPrivateKey(),
-      this.walletProvider.getNetwork(),
-      params
-    );
+    return await sendTx(this.walletProvider, params);
   }
   /**
    * Call a contract function.
    * @returns An object containing the result of the contract call.
    */
   async callContract(params) {
-    return await callContract(
-      this.walletProvider.getPrivateKey(),
-      this.walletProvider.getNetwork(),
-      params
-    );
+    return await callContract(this.walletProvider, params);
   }
 };
 // Annotate the CommonJS export names for ESM import in node:

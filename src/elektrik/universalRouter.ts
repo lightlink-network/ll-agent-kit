@@ -1,8 +1,7 @@
-import type { Route } from "@uniswap/v3-sdk";
-import { Contract, type Provider, type Wallet } from "ethers";
-import { requireMethods } from "../utils.js";
+import { Contract, type Provider } from "ethers";
 import { AbiCoder, ethers } from "ethers";
 import { universalRouterABI } from "../abis/elektrikRouter.js";
+import type { WalletProvider } from "./common.js";
 
 class UniversalRouter {
   private universalRouter: Contract;
@@ -32,12 +31,13 @@ class UniversalRouter {
    * ```
    */
   async swapExactIn(
-    wallet: Wallet,
+    wallet: WalletProvider,
     amountIn: bigint,
     amountOutMin: bigint,
     path: { tokenIn: string; tokenOut: string; fee: number }
   ) {
     const SWAP_EXACT_IN = "0x00";
+    const senderAddress = await wallet.getAddress();
 
     const v3SwapRoute = ethers.solidityPacked(
       ["address", "uint24", "address"],
@@ -47,14 +47,23 @@ class UniversalRouter {
     const inputs = AbiCoder.defaultAbiCoder().encode(
       // Encode the inputs for V3_SWAP_EXACT_IN
       ["address", "uint256", "uint256", "bytes", "bool"],
-      [wallet.address, amountIn, amountOutMin, v3SwapRoute, true]
+      [senderAddress, amountIn, amountOutMin, v3SwapRoute, true]
     );
 
-    const [executeMethod] = requireMethods(
-      this.universalRouter.connect(wallet) as any,
-      "execute"
+    // const [executeMethod] = requireMethods(
+    //   this.universalRouter.connect(wallet) as any,
+    //   "execute"
+    // );
+    // const tx = await executeMethod!(SWAP_EXACT_IN, [inputs]);
+    const callData = await this.universalRouter.interface.encodeFunctionData(
+      "execute",
+      [SWAP_EXACT_IN, [inputs]]
     );
-    const tx = await executeMethod!(SWAP_EXACT_IN, [inputs]);
+
+    const tx = await wallet.sendTransaction({
+      to: await this.universalRouter.getAddress(),
+      data: callData,
+    });
     await tx.wait();
 
     return tx;

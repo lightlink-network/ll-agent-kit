@@ -1,28 +1,36 @@
 import { Contract, type Wallet } from "ethers";
 import { requireMethods } from "../utils.js";
 import { ERC20ABI } from "../abis/erc20.js";
-import type { Network } from "../network.js";
 import { Permit2ABI } from "../abis/permit2.js";
+import type { WalletProvider } from "./common.js";
+import type { Provider } from "ethers";
 
 async function ensureApproval(
-  wallet: Wallet,
+  provider: Provider,
+  wallet: WalletProvider,
   token: string,
   target: string,
   amount: bigint
 ) {
-  const tokenContract = new Contract(token, ERC20ABI, wallet);
-  const [allowanceMethod, approveMethod] = requireMethods(
-    tokenContract,
-    "allowance",
-    "approve"
-  );
+  const senderAddress = await wallet.getAddress();
 
-  let allowance = await allowanceMethod!(wallet.address, target);
+  const tokenContract = new Contract(token, ERC20ABI, provider);
+  const [allowanceMethod] = requireMethods(tokenContract, "allowance");
+
+  let allowance = await allowanceMethod!(senderAddress, target);
 
   if (allowance < amount) {
     console.log("Approving token transfer", target, amount);
-    const tx = await approveMethod!(target, amount);
+    const callData = await tokenContract.interface.encodeFunctionData(
+      "approve",
+      [target, amount]
+    );
+    const tx = await wallet.sendTransaction({
+      to: token,
+      data: callData,
+    });
     await tx.wait();
+
     allowance = amount;
   }
 
@@ -30,30 +38,33 @@ async function ensureApproval(
 }
 
 export const ensurePermit2 = async (
+  provider: Provider,
+  wallet: WalletProvider,
   permit2: string,
-  wallet: Wallet,
   token: string,
   target: string,
   amount: bigint
 ) => {
   // Step 1. Ensure Permit2 is approved
-  await ensureApproval(wallet, token, permit2, amount);
+  await ensureApproval(provider, wallet, token, permit2, amount);
+  const senderAddress = await wallet.getAddress();
 
   // Step 2. Check if target is approved on Permit2
-  const permit2Contract = new Contract(permit2, Permit2ABI, wallet);
+  const permit2Contract = new Contract(permit2, Permit2ABI, provider);
   const [allowanceMethod] = requireMethods(permit2Contract, "allowance");
-  const allowance = await allowanceMethod!(wallet.address, token, target);
+  const allowance = await allowanceMethod!(senderAddress, token, target);
   if (allowance >= amount) {
     return;
   }
 
   // Step 3. Approve Permit2 on target
-  await approvePermit2(permit2, wallet, token, target, amount);
+  await approvePermit2(provider, wallet, permit2, token, target, amount);
 };
 
 const approvePermit2 = async (
+  provider: Provider,
+  wallet: WalletProvider,
   permit2: string,
-  wallet: Wallet,
   token: string,
   target: string,
   amount: bigint
@@ -61,9 +72,16 @@ const approvePermit2 = async (
   const ONE_DAY_IN_SECONDS = 60 * 60 * 24;
   const deadline = Math.floor(Date.now() / 1000) + ONE_DAY_IN_SECONDS;
 
-  const permit2Contract = new Contract(permit2, Permit2ABI, wallet);
-  const [approveMethod] = requireMethods(permit2Contract, "approve");
-  const tx = await approveMethod!(token, target, amount, deadline);
+  const permit2Contract = new Contract(permit2, Permit2ABI, provider);
+  const callData = await permit2Contract.interface.encodeFunctionData(
+    "approve",
+    [token, target, amount, deadline]
+  );
+
+  const tx = await wallet.sendTransaction({
+    to: permit2,
+    data: callData,
+  });
 
   await tx.wait();
   return tx;

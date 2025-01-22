@@ -28,12 +28,11 @@ export type CallContractResult = {
 export const callContractRaw: WalletToolFn<
   CallContractRawParams,
   CallContractResult
-> = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
-  const wallet = new Wallet(privateKey, provider);
+> = async (walletProvider, params) => {
+  const provider = makeNetworkProvider(walletProvider.getNetworkInfo());
 
   console.log("[tool:call_contract_raw]: calling contract", params);
-  const result = await wallet.call({
+  const result = await provider.call({
     to: params.target,
     data: params.calldata,
   });

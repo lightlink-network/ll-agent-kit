@@ -1,6 +1,6 @@
 import type { AgentExecutor } from "langchain/agents";
 import { createAgent, type AgentOptions } from "./agent.js";
-import type { WalletProvider } from "./wallet.js";
+import { PrivateKeyWalletProvider, type WalletProvider } from "./wallet.js";
 import type { Network } from "./network.js";
 import { transfer, type TransferParams } from "./tools/transfer.js";
 import {
@@ -17,10 +17,11 @@ import type { IterableReadableStream } from "@langchain/core/utils/stream";
 import type { ChatMessage } from "@langchain/core/messages";
 import { LLChatSession } from "./llchat.js";
 import type { TxResult } from "./tools/tool.js";
+import { Wallet } from "ethers";
 
 export interface LLAgentConfig extends AgentOptions {
-  privateKey: string;
-  network: Network;
+  address: string;
+  walletProvider: WalletProvider;
 }
 
 export class LLAgent {
@@ -29,13 +30,19 @@ export class LLAgent {
   private opts: AgentOptions;
 
   constructor(cfg: LLAgentConfig) {
-    this.walletProvider = {
-      getPrivateKey: () => cfg.privateKey,
-      getNetwork: () => cfg.network,
-    };
-
+    this.walletProvider = cfg.walletProvider;
     this.opts = cfg;
-    this.agent = createAgent(this.walletProvider, cfg);
+    this.agent = createAgent(cfg.address, this.walletProvider, cfg);
+  }
+
+  static async fromPrivateKey(
+    privateKey: string,
+    network: Network,
+    opts: AgentOptions
+  ) {
+    const walletProvider = new PrivateKeyWalletProvider(privateKey, network);
+    const address = await walletProvider.getAddress();
+    return new LLAgent({ ...opts, address, walletProvider });
   }
 
   /**
@@ -74,11 +81,7 @@ export class LLAgent {
    * @returns An object containing the transaction hash.
    */
   async transfer(params: TransferParams) {
-    return await transfer(
-      this.walletProvider.getPrivateKey(),
-      this.walletProvider.getNetwork(),
-      params
-    );
+    return await transfer(this.walletProvider, params);
   }
 
   /**
@@ -86,11 +89,7 @@ export class LLAgent {
    * @returns An object containing the balance of the wallet.
    */
   async getBalance(params: GetBalanceParams) {
-    return await getBalance(
-      this.walletProvider.getPrivateKey(),
-      this.walletProvider.getNetwork(),
-      params
-    );
+    return await getBalance(this.walletProvider, params);
   }
 
   /**
@@ -98,11 +97,7 @@ export class LLAgent {
    * @returns An object containing the transaction hash.
    */
   async sendTransaction(params: SendTxParams) {
-    return await sendTx(
-      this.walletProvider.getPrivateKey(),
-      this.walletProvider.getNetwork(),
-      params
-    );
+    return await sendTx(this.walletProvider, params);
   }
 
   /**
@@ -110,11 +105,7 @@ export class LLAgent {
    * @returns An object containing the result of the contract call.
    */
   async callContract(params: CallContractParams) {
-    return await callContract(
-      this.walletProvider.getPrivateKey(),
-      this.walletProvider.getNetwork(),
-      params
-    );
+    return await callContract(this.walletProvider, params);
   }
 }
 
