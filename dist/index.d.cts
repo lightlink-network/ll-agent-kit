@@ -3,6 +3,7 @@ import * as _langchain_core_utils_types from '@langchain/core/utils/types';
 import { ChainValues } from '@langchain/core/utils/types';
 import { StructuredToolInterface } from '@langchain/core/tools';
 import { ToolDefinition } from '@langchain/core/language_models/base';
+import { Networkish } from 'ethers';
 import { JsonRpcProvider } from 'ethers/providers';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { ChatMessageHistory } from 'langchain/memory';
@@ -21,8 +22,11 @@ interface Network {
         factoryAddress: string;
         routerAddress: string;
     };
+    ens?: {
+        address: string;
+    };
 }
-declare const makeNetworkProvider: (network: Network) => JsonRpcProvider;
+declare const makeNetworkProvider: (network: Network, networkInfo?: Networkish) => JsonRpcProvider;
 declare const NETWORKS: {
     PhoenixMainnet: Network;
     PegasusTestnet: Network;

@@ -1,12 +1,14 @@
 import { z } from "zod";
 import type { WalletToolFn } from "./tool.js";
-import { makeNetworkProvider } from "../network.js";
-import { EnsResolver } from "ethers";
+import { makeNetworkProvider, NETWORKS, type Network } from "../network.js";
+import { Contract, EnsPlugin, EnsResolver, namehash } from "ethers";
+import { createWeb3Name } from "@web3-name-sdk/core";
+import { resolveEnsName } from "../ens/index.js";
 
 export const ResolveENSDomainToolDefinition = {
   name: "resolve_ens_domain",
   description:
-    "Resolve a ENS or LL domain to an address. On lightlink networks, you can use LL domains e.g. vitalik.ll otherwise use ENS domains e.g. vitalik.eth",
+    "Resolve any web3 name including ENS, LL domains to an address. e.g. vitalik.ll, vitalik.eth, vitalik.arb",
   schema: z.object({
     domain: z.string(),
   }),
@@ -19,7 +21,7 @@ export type ResolveENSDomainParams = z.infer<
 export type ResolveENSDomainResult = {
   status: "success" | "failed";
   error?: string;
-  data: {
+  data?: {
     address: string | null;
   };
 };
@@ -28,29 +30,15 @@ export const resolveENSDomain: WalletToolFn<
   ResolveENSDomainParams,
   ResolveENSDomainResult
 > = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
-  if (!network.ens) {
+  console.log(`[resolve_ens_domain] Resolving '${params.domain}'`);
+
+  const address = await resolveEnsName(params.domain);
+  if (!address) {
     return {
       status: "failed",
-      error: "ENS not supported on this network",
-      data: {
-        address: null,
-      },
+      error: "ENS domain not found",
     };
   }
 
-  const ensResolver = new EnsResolver(
-    provider,
-    network.ens.resolverAddress,
-    params.domain
-  );
-
-  const address = await ensResolver.getAddress();
-
-  return {
-    status: "success",
-    data: {
-      address,
-    },
-  };
+  return { status: "success", data: { address } };
 };

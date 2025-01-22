@@ -1,3 +1,5 @@
+import type { Networkish } from "ethers";
+import { EnsPlugin } from "ethers";
 import { JsonRpcProvider } from "ethers/providers";
 
 export interface Network {
@@ -12,12 +14,15 @@ export interface Network {
     routerAddress: string;
   };
   ens?: {
-    resolverAddress: string;
+    address: string;
   };
 }
 
-export const makeNetworkProvider = (network: Network) => {
-  return new JsonRpcProvider(network.rpcUrl);
+export const makeNetworkProvider = (
+  network: Network,
+  networkInfo?: Networkish
+) => {
+  return new JsonRpcProvider(network.rpcUrl, networkInfo);
 };
 
 export const NETWORKS = {
@@ -33,7 +38,7 @@ export const NETWORKS = {
       routerAddress: "0x6B3ea22C757BbF9C78CcAaa2eD9562b57001720B",
     },
     ens: {
-      resolverAddress: "0x6D3B3F99177FB2A5de7F9E928a9BD807bF7b5BAD",
+      address: "0x5dC881dDA4e4a8d312be3544AD13118D1a04Cb17",
     },
   } as Network,
 
@@ -47,9 +52,6 @@ export const NETWORKS = {
     elektrik: {
       factoryAddress: "0x7A5531FC6628e55f22ED2C6AD015B75948fC36F4",
       routerAddress: "0x742d315e929B188e3F05FbC49774474a627b0502",
-    },
-    ens: {
-      resolverAddress: "0xF23bE83b15C2931482a2999b01F7Ab804Fd3D0b3",
     },
   } as Network,
 };

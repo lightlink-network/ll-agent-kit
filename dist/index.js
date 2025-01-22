@@ -16,9 +16,10 @@ var withWallet = (agent, fn) => {
 import { z } from "zod";
 
 // src/network.ts
+import "ethers";
 import { JsonRpcProvider } from "ethers/providers";
-var makeNetworkProvider = (network) => {
-  return new JsonRpcProvider(network.rpcUrl);
+var makeNetworkProvider = (network, networkInfo) => {
+  return new JsonRpcProvider(network.rpcUrl, networkInfo);
 };
 var NETWORKS = {
   PhoenixMainnet: {
@@ -31,6 +32,9 @@ var NETWORKS = {
     elektrik: {
       factoryAddress: "0xEE6099234bbdC793a43676D98Eb6B589ca7112D7",
       routerAddress: "0x6B3ea22C757BbF9C78CcAaa2eD9562b57001720B"
+    },
+    ens: {
+      address: "0x5dC881dDA4e4a8d312be3544AD13118D1a04Cb17"
     }
   },
   PegasusTestnet: {
@@ -2233,6 +2237,82 @@ var swapExactInput = async (privateKey, network, params) => {
   };
 };
 
+// src/tools/resolve_ens_domain.ts
+import { z as z9 } from "zod";
+import "ethers";
+import "@web3-name-sdk/core";
+
+// src/ens/index.ts
+import { Contract as Contract8 } from "ethers";
+import {
+  normalize,
+  tldNamehash,
+  validateName
+} from "@web3-name-sdk/core/utils";
+import { createWeb3Name } from "@web3-name-sdk/core";
+var resolveEnsName = async (name) => {
+  const tld = name.split(".").pop();
+  const normalizedDomain = normalize(name);
+  let address = null;
+  switch (tld) {
+    case LL_TLD_INFO.tld:
+      validateName(normalize(tld));
+      address = await resolveLLDomain(normalizedDomain);
+      break;
+    default:
+      const web3Name = createWeb3Name();
+      address = await web3Name.getAddress(name);
+  }
+  if (!address || address === "0x0000000000000000000000000000000000000000") {
+    return null;
+  }
+  return address;
+};
+var ENSRegistryABI = [
+  "function resolver(bytes32 node) external view returns (address)"
+];
+var ResolverABI = [
+  "function addr(bytes32 node) external view returns (address)"
+];
+var LL_TLD_INFO = {
+  tld: "ll",
+  identifier: 50980310089186268088337308227696701776159000940410532847939554039755637n,
+  chainId: 1890,
+  defaultRpcUrl: "https://replicator.phoenix.lightlink.io/rpc/v1",
+  registry: "0x5dC881dDA4e4a8d312be3544AD13118D1a04Cb17",
+  sann: "0x9af6F1244df403dAe39Eb2D0be1C3fD0B38e0789"
+};
+var resolveLLDomain = async (normalizedDomain) => {
+  const provider = makeNetworkProvider(NETWORKS.PhoenixMainnet);
+  const ensAddress = NETWORKS.PhoenixMainnet.ens.address;
+  const nameHash = tldNamehash(normalizedDomain, LL_TLD_INFO.identifier);
+  const ensRegistry = new Contract8(ensAddress, ENSRegistryABI, provider);
+  const resolver = await ensRegistry.resolver(nameHash);
+  const resolverContract = new Contract8(resolver, ResolverABI, provider);
+  const address = await resolverContract.addr(nameHash);
+  return address;
+};
+
+// src/tools/resolve_ens_domain.ts
+var ResolveENSDomainToolDefinition = {
+  name: "resolve_ens_domain",
+  description: "Resolve any web3 name including ENS, LL domains to an address. e.g. vitalik.ll, vitalik.eth, vitalik.arb",
+  schema: z9.object({
+    domain: z9.string()
+  })
+};
+var resolveENSDomain = async (privateKey, network, params) => {
+  console.log(`[resolve_ens_domain] Resolving '${params.domain}'`);
+  const address = await resolveEnsName(params.domain);
+  if (!address) {
+    return {
+      status: "failed",
+      error: "ENS domain not found"
+    };
+  }
+  return { status: "success", data: { address } };
+};
+
 // src/tools/index.ts
 var createTools = (agent) => [
   new Calculator(),
@@ -2249,6 +2329,10 @@ var createTools = (agent) => [
   tool2(
     json(err(withWallet(agent, swapExactInput))),
     SwapExactInputToolDefinition
+  ),
+  tool2(
+    json(err(withWallet(agent, resolveENSDomain))),
+    ResolveENSDomainToolDefinition
   )
 ];
 var json = (fn) => {

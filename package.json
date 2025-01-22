@@ -21,6 +21,7 @@
     "@langchain/core": "^0.3.26",
     "@langchain/openai": "^0.3.16",
     "@uniswap/v3-sdk": "^3.19.0",
+    "@web3-name-sdk/core": "^0.3.2",
     "ethers": "^6.13.4",
     "langchain": "^0.3.8",
     "pyodide": "^0.26.4",
