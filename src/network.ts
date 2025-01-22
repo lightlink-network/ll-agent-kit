@@ -11,6 +11,9 @@ export interface Network {
     factoryAddress: string;
     routerAddress: string;
   };
+  ens?: {
+    resolverAddress: string;
+  };
 }
 
 export const makeNetworkProvider = (network: Network) => {
@@ -29,6 +32,9 @@ export const NETWORKS = {
       factoryAddress: "0xEE6099234bbdC793a43676D98Eb6B589ca7112D7",
       routerAddress: "0x6B3ea22C757BbF9C78CcAaa2eD9562b57001720B",
     },
+    ens: {
+      resolverAddress: "0x6D3B3F99177FB2A5de7F9E928a9BD807bF7b5BAD",
+    },
   } as Network,
 
   PegasusTestnet: {
@@ -41,6 +47,9 @@ export const NETWORKS = {
     elektrik: {
       factoryAddress: "0x7A5531FC6628e55f22ED2C6AD015B75948fC36F4",
       routerAddress: "0x742d315e929B188e3F05FbC49774474a627b0502",
+    },
+    ens: {
+      resolverAddress: "0xF23bE83b15C2931482a2999b01F7Ab804Fd3D0b3",
     },
   } as Network,
 };

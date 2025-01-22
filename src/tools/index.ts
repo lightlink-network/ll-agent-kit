@@ -16,6 +16,10 @@ import {
   swapExactInput,
   SwapExactInputToolDefinition,
 } from "./swap_exact_input.js";
+import {
+  resolveENSDomain,
+  ResolveENSDomainToolDefinition,
+} from "./resolve_ens_domain.js";
 
 // Creates all tools for the agent
 export const createTools = (agent: WalletProvider) => [
@@ -33,6 +37,10 @@ export const createTools = (agent: WalletProvider) => [
   tool(
     json(err(withWallet(agent, swapExactInput))),
     SwapExactInputToolDefinition
+  ),
+  tool(
+    json(err(withWallet(agent, resolveENSDomain))),
+    ResolveENSDomainToolDefinition
   ),
 ];
 
