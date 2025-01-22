@@ -7,7 +7,9 @@ export const NetworkStatsToolDefinition = {
   name: "network_stats",
   description:
     "Get stats about the network including: total blocks, txns, avg blocktime, utilization and gas prices etc.",
-  schema: z.object({}),
+  schema: z.object({
+    chainId: z.number().describe("The chainId to get stats for"),
+  }),
 };
 
 export type NetworkStatsParams = z.infer<
@@ -24,8 +26,13 @@ export type NetworkStatsResult = {
 export const networkStats: WalletToolFn<
   NetworkStatsParams,
   NetworkStatsResult
-> = async (walletProvider, params) => {
-  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/stats`;
+> = async (wallet, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
+
+  const url = `${network.explorerUrl}/api/v2/stats`;
   const response = await fetch(url);
   const data = (await response.json()) as any;
 

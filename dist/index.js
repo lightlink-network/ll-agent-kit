@@ -1,19 +1,5 @@
 // src/agent.ts
 import { SystemMessage } from "@langchain/core/messages";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatAnthropic } from "@langchain/anthropic";
-
-// src/tools/index.ts
-import { tool as tool2 } from "@langchain/core/tools";
-
-// src/tools/tool.ts
-var withWallet = (wallet, fn) => {
-  return (params) => fn(wallet, params);
-};
-
-// src/tools/send_tx.ts
-import { z } from "zod";
 
 // src/network.ts
 import "ethers";
@@ -50,10 +36,39 @@ var NETWORKS = {
     }
   }
 };
+var NetworkManager = class {
+  networks = [];
+  constructor(networks) {
+    this.networks = networks;
+  }
+  findNetwork(nameOrId) {
+    return this.networks.find(
+      (n) => n.name === nameOrId || n.chainId === nameOrId
+    );
+  }
+  getNetworks() {
+    return [...this.networks];
+  }
+};
+
+// src/agent.ts
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatAnthropic } from "@langchain/anthropic";
+
+// src/tools/index.ts
+import { tool as tool2 } from "@langchain/core/tools";
+
+// src/tools/tool.ts
+var withWallet = (wallet, networks, fn) => {
+  return (params) => fn(wallet, networks, params);
+};
 
 // src/tools/send_tx.ts
+import { z } from "zod";
 import { parseEther } from "ethers";
 var SendTxParamsSchema = z.object({
+  chainId: z.number().describe("The chainId to send the transaction on"),
   to: z.string().optional().describe("The target of the transaction"),
   amount: z.string().optional().describe("The amount to send e.g 5.4321"),
   calldata: z.string().optional().describe("The calldata to send as hex")
@@ -63,9 +78,13 @@ var SendTxToolDefinition = {
   description: "Send a raw ethereum transaction",
   schema: SendTxParamsSchema
 };
-var sendTx = async (walletProvider, params) => {
+var sendTx = async (walletProvider, networks, params) => {
   console.log("[tool:send_tx]: sending transaction", params);
-  const tx = await walletProvider.sendTransaction({
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
+  const tx = await walletProvider.sendTransaction(network, {
     to: params.to,
     value: params.amount ? parseEther(params.amount) : void 0,
     data: params.calldata
@@ -308,6 +327,7 @@ var ERC20ABI = [
 
 // src/tools/get_balance.ts
 var BalanceParamsSchema = z2.object({
+  chainId: z2.number().describe("The chainId to get the balance on"),
   address: z2.string().describe("The address of the wallet to get the balance of"),
   token: z2.string().optional().describe(
     "The token contract address. If omitted, returns the native token balance (e.g. ETH)"
@@ -318,8 +338,12 @@ var GetBalanceToolDefinition = {
   description: "Retrieve the token balance or native currency balance for a wallet address",
   schema: BalanceParamsSchema
 };
-var getBalance = async (walletProvider, params) => {
-  const provider = makeNetworkProvider(walletProvider.getNetworkInfo());
+var getBalance = async (wallet, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
+  const provider = makeNetworkProvider(network);
   if (!params.token) {
     console.log("[tool:get_balance]: getting native currency balance");
     const balance2 = await provider.getBalance(params.address);
@@ -353,6 +377,7 @@ var getBalance = async (walletProvider, params) => {
 import { z as z3 } from "zod";
 import { Contract as Contract2, parseEther as parseEther2, parseUnits } from "ethers";
 var TransferParamsSchema = z3.object({
+  chainId: z3.number().describe("The chainId to transfer on"),
   to: z3.string().describe("The wallet address to transfer to"),
   amount: z3.number().describe("The amount to transfer e.g 5.4321"),
   token: z3.string().optional().describe(
@@ -364,11 +389,13 @@ var TransferToolDefinition = {
   description: "Transfer any token or native currency to a wallet",
   schema: TransferParamsSchema
 };
-var transfer = async (wallet, params) => {
-  const provider = makeNetworkProvider(wallet.getNetworkInfo());
+var transfer = async (wallet, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network)
+    throw new Error(`Network with chainId ${params.chainId} not found`);
   if (!params.token) {
     console.log("[tool:transfer]: transferring native currency", params);
-    const tx2 = await wallet.sendTransaction({
+    const tx2 = await wallet.sendTransaction(network, {
       to: params.to,
       value: parseEther2(params.amount.toString())
     });
@@ -378,6 +405,7 @@ var transfer = async (wallet, params) => {
       txHash: tx2.hash
     };
   }
+  const provider = makeNetworkProvider(network);
   console.log("[tool:transfer]: transferring token", params);
   const token = new Contract2(params.token, ERC20ABI, provider);
   if (!token.transfer || !token.decimals) {
@@ -387,7 +415,7 @@ var transfer = async (wallet, params) => {
     params.to,
     parseUnits(params.amount.toString(), await token.decimals())
   ]);
-  const tx = await wallet.sendTransaction({
+  const tx = await wallet.sendTransaction(network, {
     to: params.token,
     data: callData
   });
@@ -405,14 +433,18 @@ var CallContractToolDefinition = {
   name: "call_contract",
   description: "Call any contract using the abi, method name and parameters",
   schema: z4.object({
+    chainId: z4.number().describe("The chainId to call the contract on"),
     target: z4.string().describe("The target of the contract call"),
     abi: z4.string().describe("The abi of the contract, as a json array"),
     method: z4.string().describe("The method name to call"),
     params: z4.array(z4.string()).describe("The parameters to pass to the method")
   })
 };
-var callContract = async (walletProvider, params) => {
-  const provider = makeNetworkProvider(walletProvider.getNetworkInfo());
+var callContract = async (wallet, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network)
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  const provider = makeNetworkProvider(network);
   console.log(
     "[tool:call_contract]: calling contract",
     params.target,
@@ -440,17 +472,21 @@ import { Calculator } from "@langchain/community/tools/calculator";
 
 // src/tools/explorer_search.ts
 import { z as z5 } from "zod";
-import "ethers";
 var ExplorerSearchToolDefinition = {
   name: "explorer_search",
   description: "Search the block explorer with a given query, will return multiple matching items e.g. 'USDT', will return an item containing information about the USDT contract",
   schema: z5.object({
+    chainId: z5.number().describe("The chainId to search on"),
     query: z5.string().describe("The query to search for")
   })
 };
-var explorerSearch = async (walletProvider, params) => {
+var explorerSearch = async (wallet, networks, params) => {
   console.log("[tool:explorer_search]: searching for", params.query);
-  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/search?q=${params.query}`;
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
+  const url = `${network.explorerUrl}/api/v2/search?q=${params.query}`;
   const response = await fetch(url);
   const data = await response.json();
   if (data.items == void 0) {
@@ -471,10 +507,16 @@ import { z as z6 } from "zod";
 var NetworkStatsToolDefinition = {
   name: "network_stats",
   description: "Get stats about the network including: total blocks, txns, avg blocktime, utilization and gas prices etc.",
-  schema: z6.object({})
+  schema: z6.object({
+    chainId: z6.number().describe("The chainId to get stats for")
+  })
 };
-var networkStats = async (walletProvider, params) => {
-  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/stats`;
+var networkStats = async (wallet, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
+  const url = `${network.explorerUrl}/api/v2/stats`;
   const response = await fetch(url);
   const data = await response.json();
   return { status: "success", data };
@@ -487,10 +529,14 @@ var GetAbiToolDefinition = {
   name: "get_abi",
   description: "Retrieve the ABI of a contract",
   schema: z7.object({
+    chainId: z7.number().describe("The chainId to get the ABI on"),
     address: z7.string().describe("The address of the contract")
   })
 };
-var getAbi = async (walletProvider, params) => {
+var getAbi = async (walletProvider, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network)
+    throw new Error(`Network with chainId ${params.chainId} not found`);
   if (!isAddress2(params.address)) {
     return {
       status: "failed",
@@ -498,7 +544,7 @@ var getAbi = async (walletProvider, params) => {
       abi: "[]"
     };
   }
-  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/smart-contracts/${params.address}`;
+  const url = `${network.explorerUrl}/api/v2/smart-contracts/${params.address}`;
   const response = await fetch(url);
   const data = await response.json();
   if (data.abi == void 0 || data.abi == "" || data.abi == "[]") {
@@ -2218,14 +2264,18 @@ var SwapExactInputToolDefinition = {
   name: "swap_exact_input",
   description: "Swap exact input in the Elektrik DEX, will fail if user has insufficient balance in the input token.",
   schema: z8.object({
+    chainId: z8.number().describe("The chainId to swap on"),
     amount: z8.string().describe("The amount to swap, e.g. 1.2345"),
     fromToken: z8.string().describe("The asset address to swap from. (must be a token)"),
     toToken: z8.string().describe("The asset address to swap to. (must be a token)"),
     slippage: z8.number().optional().describe("Slippage tolerance (default: 0.01 for 1%)")
   })
 };
-var swapExactInput = async (wallet, params) => {
-  const network = wallet.getNetworkInfo();
+var swapExactInput = async (wallet, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
   if (!network.elektrik)
     throw new Error("Elektrik DEX not setup for this network");
   if (!network.permit2) throw new Error("Permit2 not setup for this network");
@@ -2242,7 +2292,10 @@ var swapExactInput = async (wallet, params) => {
   }
   const tx = await swapExactIn(
     provider,
-    wallet,
+    {
+      getAddress: async () => senderAddress,
+      sendTransaction: (tx2) => wallet.sendTransaction(network, tx2)
+    },
     network.permit2,
     network.elektrik.factoryAddress,
     network.elektrik.routerAddress,
@@ -2315,7 +2368,7 @@ var ResolveENSDomainToolDefinition = {
     domain: z9.string()
   })
 };
-var resolveENSDomain = async (_, params) => {
+var resolveENSDomain = async (wallet, networks, params) => {
   console.log(`[resolve_ens_domain] Resolving '${params.domain}'`);
   const address = await resolveEnsName(params.domain);
   if (!address || address === "0x0000000000000000000000000000000000000000") {
@@ -2328,27 +2381,21 @@ var resolveENSDomain = async (_, params) => {
 };
 
 // src/tools/index.ts
-var createTools = (agent) => [
+var createTools = (wallet, networks) => [
   new Calculator(),
-  tool2(json(err(withWallet(agent, sendTx))), SendTxToolDefinition),
-  tool2(json(err(withWallet(agent, callContract))), CallContractToolDefinition),
-  tool2(json(err(withWallet(agent, getBalance))), GetBalanceToolDefinition),
-  tool2(json(err(withWallet(agent, transfer))), TransferToolDefinition),
-  tool2(
-    json(err(withWallet(agent, explorerSearch))),
-    ExplorerSearchToolDefinition
-  ),
-  tool2(json(err(withWallet(agent, networkStats))), NetworkStatsToolDefinition),
-  tool2(json(err(withWallet(agent, getAbi))), GetAbiToolDefinition),
-  tool2(
-    json(err(withWallet(agent, swapExactInput))),
-    SwapExactInputToolDefinition
-  ),
-  tool2(
-    json(err(withWallet(agent, resolveENSDomain))),
-    ResolveENSDomainToolDefinition
-  )
+  wrapTool(wallet, networks, sendTx, SendTxToolDefinition),
+  wrapTool(wallet, networks, callContract, CallContractToolDefinition),
+  wrapTool(wallet, networks, getBalance, GetBalanceToolDefinition),
+  wrapTool(wallet, networks, transfer, TransferToolDefinition),
+  wrapTool(wallet, networks, explorerSearch, ExplorerSearchToolDefinition),
+  wrapTool(wallet, networks, networkStats, NetworkStatsToolDefinition),
+  wrapTool(wallet, networks, getAbi, GetAbiToolDefinition),
+  wrapTool(wallet, networks, swapExactInput, SwapExactInputToolDefinition),
+  wrapTool(wallet, networks, resolveENSDomain, ResolveENSDomainToolDefinition)
 ];
+var wrapTool = (wallet, networks, fn, definition) => {
+  return tool2(json(err(withWallet(wallet, networks, fn))), definition);
+};
 var json = (fn) => {
   return async (params) => JSON.stringify(await fn(params), (k, v) => {
     if (v instanceof BigInt) {
@@ -2380,24 +2427,34 @@ var err = (fn) => {
 // src/agent.ts
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import "ethers";
-var createSystemMessage = (network, address) => new SystemMessage(
-  `You are an AI agent on ${network.name} network capable of executing all kinds of transactions and interacting with the ${network.name} blockchain.
-    ${network.name} is an EVM compatible layer 2 network. You are able to execute transactions on behalf of the user.
+var createSystemMessage = (defaultNetwork, networks, address) => new SystemMessage(
+  `You are an AI agent designed for the ${defaultNetwork.name} network (an ethereum layer 2 network). 
+    - You are capable of executing all kinds of transactions and interacting with multiple blockchains. 
+    - You are able to execute transactions on behalf of the user.
+    - You can use Markdown to format your responses.
 
-    The user's address is ${address}.
+    The user's address is ${address}. 
 
-    If the transaction was successful, return the response in the following format:
-    The transaction was successful. The explorer link is: ${network.explorerUrl}/tx/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
-    (The explorer is running blockscout).
-  
-    If the transaction was unsuccessful, return the response in the following format, followed by an explanation if any known:
-    The transaction failed.
+    If you send transactions on behalf of the user, you should briefly explain all transactions you sent, 
+    including each transaction's hash and an explorer link to the transaction.
 
-    The WETH address for this network is ${network.weth}.
+    If the transaction was unsuccessful, explain why it failed (if known).
+
+    Default to using to ${defaultNetwork.name} (${defaultNetwork.chainId}) unless otherwise specified by the user. 
+
+    You can ONLY use the following networks:
+    ${networks.map((n) => {
+    return `	 - ${n.name} (${n.chainId})
+		 - Explorer: ${n.explorerUrl}
+		 - WETH: ${n.weth}
+		 - RPC: ${n.rpcUrl}
+		 - Chain ID: ${n.chainId}
+`;
+  }).join("")}
   `
 );
-var createPrompt = (network, address) => ChatPromptTemplate.fromMessages([
-  createSystemMessage(network, address),
+var createPrompt = (defaultNetwork, networks, address) => ChatPromptTemplate.fromMessages([
+  createSystemMessage(defaultNetwork, networks, address),
   ["placeholder", "{chat_history}"],
   ["human", "{input}"],
   ["placeholder", "{agent_scratchpad}"]
@@ -2408,7 +2465,7 @@ var models = [
   "claude-3-5-sonnet-latest",
   "claude-3-5-haiku-latest"
 ];
-var createAgent = (address, walletProvider, opts) => {
+var createAgent = (address, walletProvider, networkManager, opts) => {
   if (!models.includes(opts.model)) {
     throw new Error(`Invalid model: ${opts.model}`);
   }
@@ -2435,12 +2492,22 @@ var createAgent = (address, walletProvider, opts) => {
   if (selectedModel === void 0) {
     throw new Error("Unsupported model");
   }
-  const prompt = createPrompt(walletProvider.getNetworkInfo(), address);
+  const defaultNetwork = networkManager.findNetwork(
+    opts.defaultNetwork || NETWORKS.PegasusTestnet.chainId
+  );
+  if (!defaultNetwork) {
+    throw new Error("Default network not found");
+  }
+  const prompt = createPrompt(
+    defaultNetwork,
+    networkManager.getNetworks(),
+    address
+  );
   const tools = [
     ...opts.tools ?? []
   ];
   if (useDefaultTools) {
-    tools.push(...createTools(walletProvider));
+    tools.push(...createTools(walletProvider, networkManager));
   }
   const agent = createToolCallingAgent({
     llm: selectedModel,
@@ -2455,25 +2522,22 @@ var createAgent = (address, walletProvider, opts) => {
 };
 
 // src/wallet.ts
-import { Wallet as Wallet8 } from "ethers";
+import { Wallet as Wallet5 } from "ethers";
 var PrivateKeyWalletProvider = class {
   privateKey;
-  network;
-  constructor(privateKey, network) {
+  constructor(privateKey) {
     this.privateKey = privateKey;
-    this.network = network;
   }
   async getAddress() {
-    return await new Wallet8(this.privateKey).getAddress();
+    return await new Wallet5(this.privateKey).getAddress();
   }
-  async signTransaction(tx) {
-    return await new Wallet8(this.privateKey).signTransaction(tx);
+  async signTransaction(network, tx) {
+    tx.chainId = network.chainId;
+    return await new Wallet5(this.privateKey).signTransaction(tx);
   }
-  async sendTransaction(tx) {
-    return await new Wallet8(this.privateKey).sendTransaction(tx);
-  }
-  getNetworkInfo() {
-    return this.network;
+  async sendTransaction(network, tx) {
+    const provider = makeNetworkProvider(network);
+    return await new Wallet5(this.privateKey, provider).sendTransaction(tx);
   }
 };
 
@@ -2575,16 +2639,23 @@ import "ethers";
 var LLAgent = class _LLAgent {
   agent;
   walletProvider;
+  networkManager;
   opts;
   constructor(cfg) {
     this.walletProvider = cfg.walletProvider;
+    this.networkManager = new NetworkManager(cfg.networks);
     this.opts = cfg;
-    this.agent = createAgent(cfg.address, this.walletProvider, cfg);
+    this.agent = createAgent(
+      cfg.address,
+      this.walletProvider,
+      this.networkManager,
+      cfg
+    );
   }
-  static async fromPrivateKey(privateKey, network, opts) {
-    const walletProvider = new PrivateKeyWalletProvider(privateKey, network);
+  static async fromPrivateKey(privateKey, networks, opts) {
+    const walletProvider = new PrivateKeyWalletProvider(privateKey);
     const address = await walletProvider.getAddress();
-    return new _LLAgent({ ...opts, address, walletProvider });
+    return new _LLAgent({ ...opts, address, walletProvider, networks });
   }
   /**
    * Execute the agent with a given input.
@@ -2618,33 +2689,34 @@ var LLAgent = class _LLAgent {
    * @returns An object containing the transaction hash.
    */
   async transfer(params) {
-    return await transfer(this.walletProvider, params);
+    return await transfer(this.walletProvider, this.networkManager, params);
   }
   /**
    * Get the balance of the agent's wallet.
    * @returns An object containing the balance of the wallet.
    */
   async getBalance(params) {
-    return await getBalance(this.walletProvider, params);
+    return await getBalance(this.walletProvider, this.networkManager, params);
   }
   /**
    * Send a transaction from the agent's wallet.
    * @returns An object containing the transaction hash.
    */
   async sendTransaction(params) {
-    return await sendTx(this.walletProvider, params);
+    return await sendTx(this.walletProvider, this.networkManager, params);
   }
   /**
    * Call a contract function.
    * @returns An object containing the result of the contract call.
    */
   async callContract(params) {
-    return await callContract(this.walletProvider, params);
+    return await callContract(this.walletProvider, this.networkManager, params);
   }
 };
 export {
   LLAgent,
   LLChatSession,
   NETWORKS,
+  NetworkManager,
   makeNetworkProvider
 };

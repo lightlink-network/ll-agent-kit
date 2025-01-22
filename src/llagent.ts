@@ -1,7 +1,7 @@
 import type { AgentExecutor } from "langchain/agents";
 import { createAgent, type AgentOptions } from "./agent.js";
 import { PrivateKeyWalletProvider, type WalletProvider } from "./wallet.js";
-import type { Network } from "./network.js";
+import { NetworkManager, type Network } from "./network.js";
 import { transfer, type TransferParams } from "./tools/transfer.js";
 import {
   getBalance,
@@ -22,27 +22,35 @@ import { Wallet } from "ethers";
 export interface LLAgentConfig extends AgentOptions {
   address: string;
   walletProvider: WalletProvider;
+  networks: Network[];
 }
 
 export class LLAgent {
   private agent: AgentExecutor;
   private walletProvider: WalletProvider;
+  private networkManager: NetworkManager;
   private opts: AgentOptions;
 
   constructor(cfg: LLAgentConfig) {
     this.walletProvider = cfg.walletProvider;
+    this.networkManager = new NetworkManager(cfg.networks);
     this.opts = cfg;
-    this.agent = createAgent(cfg.address, this.walletProvider, cfg);
+    this.agent = createAgent(
+      cfg.address,
+      this.walletProvider,
+      this.networkManager,
+      cfg
+    );
   }
 
   static async fromPrivateKey(
     privateKey: string,
-    network: Network,
+    networks: Network[],
     opts: AgentOptions
   ) {
-    const walletProvider = new PrivateKeyWalletProvider(privateKey, network);
+    const walletProvider = new PrivateKeyWalletProvider(privateKey);
     const address = await walletProvider.getAddress();
-    return new LLAgent({ ...opts, address, walletProvider });
+    return new LLAgent({ ...opts, address, walletProvider, networks });
   }
 
   /**
@@ -81,7 +89,7 @@ export class LLAgent {
    * @returns An object containing the transaction hash.
    */
   async transfer(params: TransferParams) {
-    return await transfer(this.walletProvider, params);
+    return await transfer(this.walletProvider, this.networkManager, params);
   }
 
   /**
@@ -89,7 +97,7 @@ export class LLAgent {
    * @returns An object containing the balance of the wallet.
    */
   async getBalance(params: GetBalanceParams) {
-    return await getBalance(this.walletProvider, params);
+    return await getBalance(this.walletProvider, this.networkManager, params);
   }
 
   /**
@@ -97,7 +105,7 @@ export class LLAgent {
    * @returns An object containing the transaction hash.
    */
   async sendTransaction(params: SendTxParams) {
-    return await sendTx(this.walletProvider, params);
+    return await sendTx(this.walletProvider, this.networkManager, params);
   }
 
   /**
@@ -105,7 +113,7 @@ export class LLAgent {
    * @returns An object containing the result of the contract call.
    */
   async callContract(params: CallContractParams) {
-    return await callContract(this.walletProvider, params);
+    return await callContract(this.walletProvider, this.networkManager, params);
   }
 }
 

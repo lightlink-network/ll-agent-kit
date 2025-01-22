@@ -1,4 +1,4 @@
-import { Contract, parseUnits, Wallet } from "ethers";
+import { Contract, parseUnits } from "ethers";
 import type { TxResult, WalletToolFn } from "./tool.js";
 import { makeNetworkProvider } from "../network.js";
 import { z } from "zod";
@@ -10,6 +10,7 @@ export const SwapExactInputToolDefinition = {
   description:
     "Swap exact input in the Elektrik DEX, will fail if user has insufficient balance in the input token.",
   schema: z.object({
+    chainId: z.number().describe("The chainId to swap on"),
     amount: z.string().describe("The amount to swap, e.g. 1.2345"),
     fromToken: z
       .string()
@@ -30,9 +31,14 @@ export interface SwapResult extends TxResult {}
 
 export const swapExactInput: WalletToolFn<SwapParams, SwapResult> = async (
   wallet,
+  networks,
   params
 ) => {
-  const network = wallet.getNetworkInfo();
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
+
   if (!network.elektrik)
     throw new Error("Elektrik DEX not setup for this network");
   if (!network.permit2) throw new Error("Permit2 not setup for this network");
@@ -54,7 +60,10 @@ export const swapExactInput: WalletToolFn<SwapParams, SwapResult> = async (
 
   const tx = await swapExactIn(
     provider,
-    wallet,
+    {
+      getAddress: async () => senderAddress,
+      sendTransaction: (tx) => wallet.sendTransaction(network, tx),
+    },
     network.permit2,
     network.elektrik.factoryAddress,
     network.elektrik.routerAddress,

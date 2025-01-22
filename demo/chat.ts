@@ -5,8 +5,12 @@ console.log("\n");
 console.log("[DEMO] Creating agent");
 const agent = await LLAgent.fromPrivateKey(
   process.env.PRIVATE_KEY ?? "",
-  NETWORKS.PegasusTestnet,
-  { model: "gpt-4o", openAiApiKey: process.env.OPENAI_API_KEY }
+  Object.values(NETWORKS),
+  {
+    model: "gpt-4o",
+    openAiApiKey: process.env.OPENAI_API_KEY,
+    defaultNetwork: NETWORKS.PegasusTestnet.chainId,
+  }
 );
 
 const chat = agent.chat();

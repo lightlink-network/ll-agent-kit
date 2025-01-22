@@ -31,12 +31,17 @@ declare const NETWORKS: {
     PhoenixMainnet: Network;
     PegasusTestnet: Network;
 };
+declare class NetworkManager {
+    private networks;
+    constructor(networks: Network[]);
+    findNetwork(nameOrId: string | number): Network | undefined;
+    getNetworks(): Network[];
+}
 
 interface WalletProvider {
-    signTransaction: (tx: Transaction) => Promise<string>;
-    sendTransaction: (tx: TransactionRequest) => Promise<TransactionResponse>;
+    signTransaction: (network: Network, tx: Transaction) => Promise<string>;
+    sendTransaction: (network: Network, tx: TransactionRequest) => Promise<TransactionResponse>;
     getAddress: () => Promise<string>;
-    getNetworkInfo: () => Network;
 }
 
 type TxResult = {
@@ -48,16 +53,19 @@ declare const CallContractToolDefinition: {
     name: string;
     description: string;
     schema: z.ZodObject<{
+        chainId: z.ZodNumber;
         target: z.ZodString;
         abi: z.ZodString;
         method: z.ZodString;
         params: z.ZodArray<z.ZodString, "many">;
     }, "strip", z.ZodTypeAny, {
+        chainId: number;
         params: string[];
         target: string;
         abi: string;
         method: string;
     }, {
+        chainId: number;
         params: string[];
         target: string;
         abi: string;
@@ -78,17 +86,21 @@ interface AgentOptions {
     anthropicApiKey?: string;
     tools?: ToolDefinition[] | StructuredToolInterface[];
     useDefaultTools?: boolean;
+    defaultNetwork?: number;
 }
 
 declare const TransferParamsSchema: z.ZodObject<{
+    chainId: z.ZodNumber;
     to: z.ZodString;
     amount: z.ZodNumber;
     token: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
+    chainId: number;
     to: string;
     amount: number;
     token?: string | undefined;
 }, {
+    chainId: number;
     to: string;
     amount: number;
     token?: string | undefined;
@@ -96,13 +108,16 @@ declare const TransferParamsSchema: z.ZodObject<{
 type TransferParams = z.infer<typeof TransferParamsSchema>;
 
 declare const BalanceParamsSchema: z.ZodObject<{
+    chainId: z.ZodNumber;
     address: z.ZodString;
     token: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     address: string;
+    chainId: number;
     token?: string | undefined;
 }, {
     address: string;
+    chainId: number;
     token?: string | undefined;
 }>;
 type GetBalanceParams = z.infer<typeof BalanceParamsSchema>;
@@ -113,14 +128,17 @@ type GetBalanceResult = {
 };
 
 declare const SendTxParamsSchema: z.ZodObject<{
+    chainId: z.ZodNumber;
     to: z.ZodOptional<z.ZodString>;
     amount: z.ZodOptional<z.ZodString>;
     calldata: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
+    chainId: number;
     to?: string | undefined;
     amount?: string | undefined;
     calldata?: string | undefined;
 }, {
+    chainId: number;
     to?: string | undefined;
     amount?: string | undefined;
     calldata?: string | undefined;
@@ -162,13 +180,15 @@ declare class LLChatSession {
 interface LLAgentConfig extends AgentOptions {
     address: string;
     walletProvider: WalletProvider;
+    networks: Network[];
 }
 declare class LLAgent {
     private agent;
     private walletProvider;
+    private networkManager;
     private opts;
     constructor(cfg: LLAgentConfig);
-    static fromPrivateKey(privateKey: string, network: Network, opts: AgentOptions): Promise<LLAgent>;
+    static fromPrivateKey(privateKey: string, networks: Network[], opts: AgentOptions): Promise<LLAgent>;
     /**
      * Execute the agent with a given input.
      * @returns An object containing the agent's response.
@@ -221,4 +241,4 @@ interface AgentStreamChunkStep {
     observation: string;
 }
 
-export { type AgentStreamChunk, type AgentStreamChunkStep, LLAgent, type LLAgentConfig, LLChatSession, NETWORKS, type Network, makeNetworkProvider };
+export { type AgentStreamChunk, type AgentStreamChunkStep, LLAgent, type LLAgentConfig, LLChatSession, NETWORKS, type Network, NetworkManager, makeNetworkProvider };

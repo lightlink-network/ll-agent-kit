@@ -1,5 +1,5 @@
 import { tool } from "@langchain/core/tools";
-import { withWallet } from "./tool.js";
+import { withWallet, type WalletToolFn } from "./tool.js";
 import { sendTx, SendTxToolDefinition } from "./send_tx.js";
 import { getBalance, GetBalanceToolDefinition } from "./get_balance.js";
 import { transfer, TransferToolDefinition } from "./transfer.js";
@@ -20,33 +20,41 @@ import {
   resolveENSDomain,
   ResolveENSDomainToolDefinition,
 } from "./resolve_ens_domain.js";
+import type { NetworkManager } from "../network.js";
+import type { ToolDefinition } from "@langchain/core/language_models/base";
 
 // Creates all tools for the agent
-export const createTools = (agent: WalletProvider) => [
+export const createTools = (
+  wallet: WalletProvider,
+  networks: NetworkManager
+) => [
   new Calculator(),
-  tool(json(err(withWallet(agent, sendTx))), SendTxToolDefinition),
-  tool(json(err(withWallet(agent, callContract))), CallContractToolDefinition),
-  tool(json(err(withWallet(agent, getBalance))), GetBalanceToolDefinition),
-  tool(json(err(withWallet(agent, transfer))), TransferToolDefinition),
-  tool(
-    json(err(withWallet(agent, explorerSearch))),
-    ExplorerSearchToolDefinition
-  ),
-  tool(json(err(withWallet(agent, networkStats))), NetworkStatsToolDefinition),
-  tool(json(err(withWallet(agent, getAbi))), GetAbiToolDefinition),
-  tool(
-    json(err(withWallet(agent, swapExactInput))),
-    SwapExactInputToolDefinition
-  ),
-  tool(
-    json(err(withWallet(agent, resolveENSDomain))),
-    ResolveENSDomainToolDefinition
-  ),
+  wrapTool(wallet, networks, sendTx, SendTxToolDefinition),
+  wrapTool(wallet, networks, callContract, CallContractToolDefinition),
+  wrapTool(wallet, networks, getBalance, GetBalanceToolDefinition),
+  wrapTool(wallet, networks, transfer, TransferToolDefinition),
+  wrapTool(wallet, networks, explorerSearch, ExplorerSearchToolDefinition),
+  wrapTool(wallet, networks, networkStats, NetworkStatsToolDefinition),
+  wrapTool(wallet, networks, getAbi, GetAbiToolDefinition),
+  wrapTool(wallet, networks, swapExactInput, SwapExactInputToolDefinition),
+  wrapTool(wallet, networks, resolveENSDomain, ResolveENSDomainToolDefinition),
 ];
+
+// Wraps a tool, giving it access to the wallet, network,
+// serializes the result to JSON, and wraps it in an error handler
+// so that the agent can always read the result.
+export const wrapTool = <T, R>(
+  wallet: WalletProvider,
+  networks: NetworkManager,
+  fn: WalletToolFn<T, R>,
+  definition: any
+) => {
+  return tool(json(err(withWallet(wallet, networks, fn))), definition);
+};
 
 // Wraps a tool function in a JSON serializer, so that the result can be
 // read by the agent. (Also handles bigint values)
-export const json = <T, R>(fn: (params: T) => Promise<R>) => {
+const json = <T, R>(fn: (params: T) => Promise<R>) => {
   return async (params: T) =>
     JSON.stringify(await fn(params), (k, v) => {
       // handle bigint values
@@ -59,7 +67,7 @@ export const json = <T, R>(fn: (params: T) => Promise<R>) => {
 
 // Wraps a tool function in an error handler, which format the error
 // as text for the agent to read.
-export const err = (fn: (...args: any[]) => Promise<any>) => {
+const err = (fn: (...args: any[]) => Promise<any>) => {
   return async (...args: any[]) => {
     try {
       return await fn(...args);

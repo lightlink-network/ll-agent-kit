@@ -55,3 +55,21 @@ export const NETWORKS = {
     },
   } as Network,
 };
+
+export class NetworkManager {
+  private networks: Network[] = [];
+
+  constructor(networks: Network[]) {
+    this.networks = networks;
+  }
+
+  findNetwork(nameOrId: string | number) {
+    return this.networks.find(
+      (n) => n.name === nameOrId || n.chainId === nameOrId
+    );
+  }
+
+  getNetworks() {
+    return [...this.networks];
+  }
+}

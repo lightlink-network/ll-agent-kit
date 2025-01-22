@@ -6,6 +6,7 @@ export const GetAbiToolDefinition = {
   name: "get_abi",
   description: "Retrieve the ABI of a contract",
   schema: z.object({
+    chainId: z.number().describe("The chainId to get the ABI on"),
     address: z.string().describe("The address of the contract"),
   }),
 };
@@ -21,8 +22,13 @@ interface GetAbiResult {
 
 export const getAbi: WalletToolFn<GetAbiToolParams, GetAbiResult> = async (
   walletProvider,
+  networks,
   params
 ) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network)
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+
   if (!isAddress(params.address)) {
     return {
       status: "failed",
@@ -31,7 +37,7 @@ export const getAbi: WalletToolFn<GetAbiToolParams, GetAbiResult> = async (
     };
   }
 
-  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/smart-contracts/${params.address}`;
+  const url = `${network.explorerUrl}/api/v2/smart-contracts/${params.address}`;
 
   const response = await fetch(url);
   const data = (await response.json()) as any;

@@ -26,7 +26,7 @@ export type ResolveENSDomainResult = {
 export const resolveENSDomain: WalletToolFn<
   ResolveENSDomainParams,
   ResolveENSDomainResult
-> = async (_, params) => {
+> = async (wallet, networks, params) => {
   console.log(`[resolve_ens_domain] Resolving '${params.domain}'`);
 
   const address = await resolveEnsName(params.domain);

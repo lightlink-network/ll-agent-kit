@@ -6,6 +6,7 @@ import { Contract, formatEther, formatUnits, isAddress } from "ethers";
 import { ERC20ABI } from "../abis/erc20.js";
 
 const BalanceParamsSchema = z.object({
+  chainId: z.number().describe("The chainId to get the balance on"),
   address: z
     .string()
     .describe("The address of the wallet to get the balance of"),
@@ -35,8 +36,13 @@ export type GetBalanceResult = {
 export const getBalance: WalletToolFn<
   GetBalanceParams,
   GetBalanceResult
-> = async (walletProvider, params) => {
-  const provider = makeNetworkProvider(walletProvider.getNetworkInfo());
+> = async (wallet, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
+
+  const provider = makeNetworkProvider(network);
 
   if (!params.token) {
     console.log("[tool:get_balance]: getting native currency balance");

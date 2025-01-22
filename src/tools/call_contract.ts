@@ -1,13 +1,14 @@
 import { z } from "zod";
-import { makeNetworkProvider } from "../network.js";
 import type { WalletToolFn } from "./tool.js";
-import { Contract, Wallet } from "ethers";
+import { Contract } from "ethers";
 import type { Result } from "ethers";
+import { makeNetworkProvider } from "../network.js";
 
 export const CallContractToolDefinition = {
   name: "call_contract",
   description: "Call any contract using the abi, method name and parameters",
   schema: z.object({
+    chainId: z.number().describe("The chainId to call the contract on"),
     target: z.string().describe("The target of the contract call"),
     abi: z.string().describe("The abi of the contract, as a json array"),
     method: z.string().describe("The method name to call"),
@@ -30,8 +31,12 @@ export type CallContractResult = {
 export const callContract: WalletToolFn<
   CallContractParams,
   CallContractResult
-> = async (walletProvider, params) => {
-  const provider = makeNetworkProvider(walletProvider.getNetworkInfo());
+> = async (wallet, networks, params) => {
+  const network = networks.findNetwork(params.chainId);
+  if (!network)
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+
+  const provider = makeNetworkProvider(network);
 
   console.log(
     "[tool:call_contract]: calling contract",

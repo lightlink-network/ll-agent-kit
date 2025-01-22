@@ -1,13 +1,12 @@
 import { z } from "zod";
 import type { WalletToolFn } from "./tool.js";
-import { makeNetworkProvider } from "../network.js";
-import { Wallet } from "ethers";
 
 export const ExplorerSearchToolDefinition = {
   name: "explorer_search",
   description:
     "Search the block explorer with a given query, will return multiple matching items e.g. 'USDT', will return an item containing information about the USDT contract",
   schema: z.object({
+    chainId: z.number().describe("The chainId to search on"),
     query: z.string().describe("The query to search for"),
   }),
 };
@@ -29,9 +28,14 @@ export type ExplorerSearchResult = {
 export const explorerSearch: WalletToolFn<
   ExplorerSearchParams,
   ExplorerSearchResult
-> = async (walletProvider, params) => {
+> = async (wallet, networks, params) => {
   console.log("[tool:explorer_search]: searching for", params.query);
-  const url = `${walletProvider.getNetworkInfo().explorerUrl}/api/v2/search?q=${params.query}`;
+  const network = networks.findNetwork(params.chainId);
+  if (!network) {
+    throw new Error(`Network with chainId ${params.chainId} not found`);
+  }
+
+  const url = `${network.explorerUrl}/api/v2/search?q=${params.query}`;
   const response = await fetch(url);
   const data = (await response.json()) as any;
 

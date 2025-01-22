@@ -1,6 +1,6 @@
 {
   "name": "ll-agent-kit",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "LL Agent Kit",
   "main": "dist/index.js",
   "type": "module",
