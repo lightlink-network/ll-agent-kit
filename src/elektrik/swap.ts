@@ -1,12 +1,12 @@
-import type { Wallet } from "ethers";
-import type { Network } from "../network.js";
+import type { Provider } from "ethers";
 import UniversalRouter from "./universalRouter.js";
 import { findPoolAddress, getPoolInfo } from "./pool.js";
-import { calcMinAmountOut, calculateAmountOut } from "./amount.js";
 import { ensurePermit2 } from "./allowance.js";
+import type { WalletProvider } from "./common.js";
 
 export const swapExactIn = async (
-  wallet: Wallet,
+  provider: Provider,
+  wallet: WalletProvider,
   permit2: string,
   factoryAddress: string,
   routerAddress: string,
@@ -15,12 +15,10 @@ export const swapExactIn = async (
   tokenOut: string,
   slippage: number
 ) => {
-  if (!wallet.provider) throw new Error("Wallet provider not found");
-
   // Find the pool information
   const poolInfo = await getPoolInfo(
-    await findPoolAddress(factoryAddress, wallet.provider, tokenIn, tokenOut),
-    wallet.provider
+    await findPoolAddress(factoryAddress, provider, tokenIn, tokenOut),
+    provider
   );
   console.log("GOT POOL ADDRESS", poolInfo.address, poolInfo.fee);
 
@@ -32,10 +30,17 @@ export const swapExactIn = async (
   const amountOutMin = 1n;
 
   // Ensure the router is approved
-  await ensurePermit2(permit2, wallet, tokenIn, routerAddress, amountIn);
+  await ensurePermit2(
+    provider,
+    wallet,
+    permit2,
+    tokenIn,
+    routerAddress,
+    amountIn
+  );
 
   // Do the swap
-  const router = new UniversalRouter(routerAddress, wallet.provider);
+  const router = new UniversalRouter(routerAddress, provider);
   const tx = await router.swapExactIn(wallet, amountIn, amountOutMin, {
     tokenIn,
     tokenOut,

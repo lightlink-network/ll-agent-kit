@@ -56,6 +56,7 @@ export interface AgentOptions {
 }
 
 export const createAgent = (
+  address: string,
   walletProvider: WalletProvider,
   opts: AgentOptions
 ) => {
@@ -93,8 +94,7 @@ export const createAgent = (
     throw new Error("Unsupported model");
   }
 
-  const wallet = new Wallet(walletProvider.getPrivateKey());
-  const prompt = createPrompt(walletProvider.getNetwork(), wallet.address);
+  const prompt = createPrompt(walletProvider.getNetworkInfo(), address);
 
   // Create tools
   const tools = [

@@ -24,12 +24,10 @@ export const TransferToolDefinition = {
 };
 
 export const transfer: WalletToolFn<TransferParams, TxResult> = async (
-  privateKey,
-  network,
+  wallet,
   params
 ) => {
-  const provider = makeNetworkProvider(network);
-  const wallet = new Wallet(privateKey, provider);
+  const provider = makeNetworkProvider(wallet.getNetworkInfo());
 
   if (!params.token) {
     console.log("[tool:transfer]: transferring native currency", params);
@@ -55,10 +53,15 @@ export const transfer: WalletToolFn<TransferParams, TxResult> = async (
     throw new Error("Internal error: Incorrect ERC20 ABI");
   }
 
-  const tx = await token.transfer(
+  const callData = token.interface.encodeFunctionData("transfer", [
     params.to,
-    parseUnits(params.amount.toString(), await token.decimals())
-  );
+    parseUnits(params.amount.toString(), await token.decimals()),
+  ]);
+
+  const tx = await wallet.sendTransaction({
+    to: params.token,
+    data: callData,
+  });
 
   // wait for the transaction to be mined
   await tx.wait();

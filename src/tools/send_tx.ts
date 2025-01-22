@@ -20,15 +20,11 @@ export const SendTxToolDefinition = {
 };
 
 export const sendTx: WalletToolFn<SendTxParams, TxResult> = async (
-  privateKey,
-  network,
+  walletProvider,
   params
 ) => {
-  const provider = makeNetworkProvider(network);
-  const wallet = new Wallet(privateKey, provider);
-
   console.log("[tool:send_tx]: sending transaction", params);
-  const tx = await wallet.sendTransaction({
+  const tx = await walletProvider.sendTransaction({
     to: params.to,
     value: params.amount ? parseEther(params.amount) : undefined,
     data: params.calldata,

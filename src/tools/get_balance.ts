@@ -35,8 +35,8 @@ export type GetBalanceResult = {
 export const getBalance: WalletToolFn<
   GetBalanceParams,
   GetBalanceResult
-> = async (privateKey, network, params) => {
-  const provider = makeNetworkProvider(network);
+> = async (walletProvider, params) => {
+  const provider = makeNetworkProvider(walletProvider.getNetworkInfo());
 
   if (!params.token) {
     console.log("[tool:get_balance]: getting native currency balance");
